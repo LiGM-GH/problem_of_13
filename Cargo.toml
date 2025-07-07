@@ -1,0 +1,18 @@
+[package]
+name = "problem_of_13"
+version = "0.1.0"
+edition = "2024"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.profiling]
+inherits = "release"
+debug = true
+strip = false
+
+[dependencies]
+rayon = "1.10.0"
+tap = "1.0.1"
