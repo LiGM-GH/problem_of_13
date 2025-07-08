@@ -112,7 +112,8 @@ mod tests {
     use rayon::iter::{ParallelBridge, ParallelExtend};
 
     use crate::{
-        bench_it, get_initial, integer, string, traits::SumSequencerMut,
+        bench_it, get_initial, integer, string,
+        traits::{SumSequencer, SumSequencerMut, SumSequencerOnce},
     };
 
     #[test]
@@ -142,10 +143,8 @@ mod tests {
     #[test]
     fn test_int_variant() {
         let iterations = 10000;
-        let mut str_var = string::WithDigitSum13 {};
-        let mut int_var = integer::WithDigitSum13 {};
-        let strval = str_var.get_ints(iterations);
-        let intval = int_var.get_ints(iterations);
+        let strval = string::WithDigitSum13 {}.get_ints(iterations);
+        let intval = integer::WithDigitSum13 {}.get_ints(iterations);
 
         strval
             .zip(intval)
@@ -156,11 +155,9 @@ mod tests {
     fn test_int_super() {
         let iterations = 10000;
 
-        let mut cool = integer::Rayon::new(13);
-        let cool = cool.get_ints(iterations);
+        let cool = integer::Rayon::new(13).get_ints(iterations);
 
-        let mut int_var = integer::WithDigitSum13 {};
-        let intval = int_var.get_ints(iterations);
+        let intval = integer::WithDigitSum13 {}.get_ints(iterations);
 
         let mut cool_set = HashSet::new();
         cool_set.par_extend(cool.par_bridge());
@@ -199,8 +196,7 @@ mod tests {
     fn test_int_general_again() {
         let iterations = 100_000;
 
-        let mut int_var = integer::WithDigitSum::new(13);
-        let intval = int_var.get_ints(iterations);
+        let intval = integer::WithDigitSum::new(13).get_ints(iterations);
         println!(
             "The last number of super integers is {:?}",
             bench_it(|| { intval.last() })
@@ -211,10 +207,8 @@ mod tests {
     fn test_super_int_again() {
         let iterations = 100_000;
 
-        let mut int_var = integer::Rayon::new(13);
-        let intval = int_var.get_ints(iterations);
-        let mut super_int = integer::WithDigitSum::new(13);
-        let super_int = super_int.get_ints(iterations);
+        let intval = integer::Rayon::new(13).get_ints(iterations);
+        let super_int = integer::WithDigitSum::new(13).get_ints(iterations);
 
         println!(
             "The last number of super integers is {:?}",
