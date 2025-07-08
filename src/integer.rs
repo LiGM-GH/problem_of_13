@@ -4,7 +4,7 @@ use std::num::NonZeroU8;
 
 use rayon::prelude::*;
 
-use crate::{DigitSum, get_initial, new_expect, traits::SumSequencerMut};
+use crate::{get_initial, impl_mut_for_refmut, new_expect, traits::{SumSequencer, SumSequencerMut}, DigitSum};
 
 pub struct WithDigitSum13;
 pub struct WithDigitSum(pub NonZeroU8);
@@ -17,9 +17,15 @@ new_expect!(FutureLooking);
 new_expect!(FullyPar);
 new_expect!(Rayon);
 
-impl SumSequencerMut for WithDigitSum13 {
+impl_mut_for_refmut!(WithDigitSum13);
+impl_mut_for_refmut!(WithDigitSum);
+impl_mut_for_refmut!(FutureLooking);
+impl_mut_for_refmut!(FullyPar);
+impl_mut_for_refmut!(Rayon);
+
+impl SumSequencer for WithDigitSum13 {
     fn get_ints(
-        &mut self,
+        &self,
         iterations: u32,
     ) -> impl Iterator<Item = u64> + use<> {
         std::iter::once(49).chain((0..iterations - 1).scan(49u64, |acc, _| {
@@ -60,9 +66,9 @@ impl SumSequencerMut for WithDigitSum13 {
     }
 }
 
-impl SumSequencerMut for WithDigitSum {
+impl SumSequencer for WithDigitSum {
     fn get_ints(
-        &mut self,
+        &self,
         iterations: u32,
     ) -> impl Iterator<Item = u64> + use<> {
         let sum = self.0;
@@ -100,14 +106,14 @@ impl SumSequencerMut for WithDigitSum {
     }
 }
 
-impl SumSequencerMut for Rayon {
+impl SumSequencer for Rayon {
     /// This function is here as a reminder that not everything that looks like an optimization is one.
     /// It is actually much slower than integer_dynamic and integer_static.
     /// The reasons are simple: each thread creation is actually a syscall.
     /// And on the micro-level, as it is done here, those "optimizations" are actually doing more harm
     /// than anything useful. The syscalls are much more costly than simple iteration.
     fn get_ints(
-        &mut self,
+        &self,
         iterations: u32,
     ) -> impl Iterator<Item = u64> + use<> {
         let initial = get_initial(self.0);
@@ -148,9 +154,9 @@ impl SumSequencerMut for Rayon {
     }
 }
 
-impl SumSequencerMut for FutureLooking {
+impl SumSequencer for FutureLooking {
     fn get_ints(
-        &mut self,
+        &self,
         iterations: u32,
     ) -> impl Iterator<Item = u64> + use<> {
         let initial = get_initial(self.0);
@@ -196,7 +202,7 @@ fn count_addition(sum: NonZeroU8, value: u64) -> u64 {
     }
 }
 
-impl SumSequencerMut for FullyPar {
+impl SumSequencer for FullyPar {
     /// NOTE: How to count the highest number (or at least its number of digits) ahead of time?
     ///
     /// Let's say we have 10 iterations.
@@ -255,7 +261,7 @@ impl SumSequencerMut for FullyPar {
     /// }
     /// ```
     fn get_ints(
-        &mut self,
+        &self,
         iterations: u32,
     ) -> impl Iterator<Item = u64> + use<> {
         let num_threads = rayon::current_num_threads() as u32;

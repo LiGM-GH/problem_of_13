@@ -1,7 +1,7 @@
 use std::num::NonZeroU8;
 
 use tap::Pipe;
-use traits::SumSequencerMut;
+use traits::{SumSequencerMut, SumSequencerOnce};
 
 mod combinatorics;
 mod integer;
@@ -49,13 +49,13 @@ fn bench_it<T>(fun: impl FnOnce() -> T) -> BenchResult<T> {
 fn print_result<T: std::fmt::Debug>(name: &str) -> impl FnOnce(BenchResult<T>) {
     move |val: BenchResult<T>| {
         println!(
-            "The last number of the {:?} is {:?} with duration of {:?}",
+            "The last number of the {:<20} is {:^20?} with duration of {:^20?}",
             name, val.value, val.duration
         )
     }
 }
 
-fn measure_fun(mut value: impl SumSequencerMut, iterations: u32, label: &str) {
+fn measure_fun(value: impl SumSequencerOnce, iterations: u32, label: &str) {
     value
         .get_ints(iterations)
         .pipe(|val| bench_it(|| val.last()))
@@ -75,6 +75,11 @@ fn main() {
     measure_fun(integer::Rayon(sum), iterations, "rayon_dynamic");
 
     measure_fun(integer::FutureLooking(sum), iterations, "future_looking");
+
+    let mut thing = integer::FutureLooking::new(20);
+    measure_fun(&thing, 40, "40 iterations of future_looking of 20");
+    thing = integer::FutureLooking::new(17);
+    measure_fun(&thing, 40, "40 iterations of future_looking of 17");
 }
 
 fn get_initial(sum: NonZeroU8) -> u64 {

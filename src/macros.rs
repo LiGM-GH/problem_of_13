@@ -12,3 +12,18 @@ macro_rules! new_expect {
         }
     };
 }
+
+#[macro_export]
+macro_rules! impl_mut_for_refmut {
+    ($owner:ident) => {
+        #[allow(refining_impl_trait)]
+        impl SumSequencerMut for &mut $owner {
+            fn get_ints(
+                &mut self,
+                iterations: u32,
+            ) -> impl Iterator<Item = u64> + use<> {
+                SumSequencerMut::get_ints(*self, iterations)
+            }
+        }
+    };
+}
