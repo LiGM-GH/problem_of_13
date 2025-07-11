@@ -1,4 +1,4 @@
-// // TODO: figure out how to make this work
+// // TODO: Figure out how to make this work
 // #[allow(refining_impl_trait)]
 // impl<T: SumSequencerMut> SumSequencerMut for &mut T {
 //     /// Since
@@ -57,7 +57,7 @@ impl<T: SumSequencer> SumSequencer for &T {
     }
 }
 
-// // TODO: figure out how to make this work
+// // TODO: Figure out how to make this work
 // #[allow(refining_impl_trait)]
 // impl<T: SumSequencer> SumSequencerMut for &mut T {
 //     /// Since
@@ -79,6 +79,7 @@ mod tests {
     use super::{SumSequencer, SumSequencerMut, SumSequencerOnce};
 
     #[test]
+    #[allow(unused, dead_code, refining_impl_trait)]
     /// test by compilation - OK if compiles
     fn test_types() {
         #[allow(dead_code)]

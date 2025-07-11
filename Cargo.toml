@@ -3,6 +3,9 @@ name = "problem_of_13"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+multithreaded = []
+
 [profile.release]
 lto = true
 codegen-units = 1

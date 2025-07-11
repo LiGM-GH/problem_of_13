@@ -1,7 +1,9 @@
 use std::num::NonZeroU8;
 
 use tap::Pipe;
-use traits::{SumSequencerMut, SumSequencerOnce};
+
+#[allow(unused)]
+use traits::{SumSequencer, SumSequencerMut, SumSequencerOnce};
 
 mod combinatorics;
 mod integer;
@@ -13,17 +15,24 @@ trait DigitSum {
     fn digits_sum(&self) -> u64;
 }
 
+struct DigitIter(u64, u64);
+
+impl Iterator for DigitIter {
+    type Item = u64;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.0 == 0 {
+            None
+        } else {
+            let ret = self.0 % self.1;
+            self.0 /= self.1;
+            Some(ret)
+        }
+    }
+}
+
 impl DigitSum for u64 {
     fn digits_sum(&self) -> u64 {
-        let mut that = *self;
-        let mut sum: u64 = 0;
-
-        while that != 0 {
-            sum += that % 10;
-            that /= 10;
-        }
-
-        sum
+        DigitIter(*self, 10).sum()
     }
 }
 
@@ -65,21 +74,26 @@ fn measure_fun(value: impl SumSequencerOnce, iterations: u32, label: &str) {
 /// The problem is the following:
 /// Find all the numbers that have sum of its digits equal to 13
 fn main() {
-    let iterations = 100_000;
+    let iterations = 1_000_000;
     let sum = NonZeroU8::new(13).expect("Couldn't create NonZeroU8 from 13");
 
     measure_fun(integer::WithDigitSum13 {}, iterations, "integer_static");
 
     measure_fun(integer::WithDigitSum(sum), iterations, "integer_dynamic");
 
-    measure_fun(integer::Rayon(sum), iterations, "rayon_dynamic");
-
     measure_fun(integer::FutureLooking(sum), iterations, "future_looking");
 
-    let mut thing = integer::FutureLooking::new(20);
-    measure_fun(&thing, 40, "40 iterations of future_looking of 20");
-    thing = integer::FutureLooking::new(17);
-    measure_fun(&thing, 40, "40 iterations of future_looking of 17");
+    measure_fun(integer::FullyPar(sum), iterations, "fully_par");
+
+    bench_it(|| integer::FullyPar(sum).get_ints(iterations).last())
+        .pipe(print_result("fully_par full"));
+
+    bench_it(|| integer::FullyPar(sum).get_ints(iterations))
+        .pipe(|BenchResult { duration, value }| BenchResult {
+            duration,
+            value: value.last(),
+        })
+        .pipe(print_result("fully_par preproc"));
 }
 
 fn get_initial(sum: NonZeroU8) -> u64 {
@@ -107,13 +121,10 @@ fn get_initial(sum: NonZeroU8) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, num::NonZeroU8};
-
-    use rayon::iter::{ParallelBridge, ParallelExtend};
+    use std::num::NonZeroU8;
 
     use crate::{
-        bench_it, get_initial, integer, string,
-        traits::{SumSequencer, SumSequencerMut, SumSequencerOnce},
+        bench_it, get_initial, integer, string, traits::SumSequencerOnce,
     };
 
     #[test]
@@ -152,23 +163,6 @@ mod tests {
     }
 
     #[test]
-    fn test_int_super() {
-        let iterations = 10000;
-
-        let cool = integer::Rayon::new(13).get_ints(iterations);
-
-        let intval = integer::WithDigitSum13 {}.get_ints(iterations);
-
-        let mut cool_set = HashSet::new();
-        cool_set.par_extend(cool.par_bridge());
-
-        let mut int_set = HashSet::new();
-        int_set.par_extend(intval.par_bridge());
-
-        assert_eq!(int_set, cool_set);
-    }
-
-    #[test]
     fn test_int_general() {
         let spawn_thing = |number: NonZeroU8| {
             let iterations = 2 * number.get() as u32;
@@ -203,20 +197,107 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_super_int_again() {
-        let iterations = 100_000;
+    #[allow(unused, dead_code, deprecated)]
+    mod multithreaded {
+        use std::collections::HashSet;
 
-        let intval = integer::Rayon::new(13).get_ints(iterations);
-        let super_int = integer::WithDigitSum::new(13).get_ints(iterations);
+        use rayon::iter::{ParallelBridge, ParallelExtend};
 
-        println!(
-            "The last number of super integers is {:?}",
-            bench_it(|| { intval.last() })
-        );
-        println!(
-            "The last number of super integers is {:?}",
-            bench_it(|| { super_int.last() })
-        );
+        use crate::{bench_it, integer, traits::SumSequencer};
+
+        #[test]
+        #[cfg(feature = "multithreaded")]
+        fn test_fully_par_with_zip() {
+            let iterations = 100_000;
+            let intval = integer::WithDigitSum::new(13).get_ints(iterations);
+
+            let super_val = integer::FullyPar::new(13).get_ints(iterations);
+
+            let mut iter = intval.zip(super_val).peekable();
+            let mut need_panic = false;
+
+            while let Some((left, right)) = iter.next() {
+                if left == right
+                    && let Some((left_peek, right_peek)) = iter.peek()
+                    && left_peek != right_peek
+                {
+                    println!("{left} | {right} | {left_peek} | {right_peek}");
+                    need_panic = true;
+                }
+            }
+
+            if need_panic {
+                panic!();
+            }
+        }
+
+        #[test]
+        #[cfg(feature = "multithreaded")]
+        fn test_fully_par_with_hashsets() {
+            let iterations = 1_000_000;
+            let intval = integer::WithDigitSum::new(13)
+                .get_ints(iterations)
+                .take_while(|val| *val < iterations as u64);
+
+            let super_val = integer::FullyPar::new(13)
+                .get_ints(iterations)
+                .take_while(|val| *val < iterations as u64);
+
+            let int_result = intval.collect::<HashSet<_>>();
+            let super_result = super_val.collect::<HashSet<_>>();
+
+            assert_eq!(
+                super_result
+                    .difference(&int_result)
+                    .copied()
+                    .collect::<Vec<u64>>(),
+                vec![],
+            );
+
+            let mut diff = int_result
+                .difference(&super_result)
+                .copied()
+                .collect::<Vec<u64>>();
+
+            diff.sort();
+
+            assert_eq!(diff, vec![]);
+        }
+
+        #[test]
+        #[cfg(feature = "multithreaded")]
+        fn test_int_super() {
+            let iterations = 10000;
+
+            let cool = integer::Rayon::new(13).get_ints(iterations);
+
+            let intval = integer::WithDigitSum13 {}.get_ints(iterations);
+
+            let mut cool_set = HashSet::new();
+            cool_set.par_extend(cool.par_bridge());
+
+            let mut int_set = HashSet::new();
+            int_set.par_extend(intval.par_bridge());
+
+            assert_eq!(int_set, cool_set);
+        }
+
+        #[test]
+        #[cfg(feature = "multithreaded")]
+        fn test_super_int_again() {
+            let iterations = 100_000;
+
+            let intval = integer::Rayon::new(13).get_ints(iterations);
+            let super_int = integer::WithDigitSum::new(13).get_ints(iterations);
+
+            println!(
+                "The last number of super integers is {:?}",
+                bench_it(|| { intval.last() })
+            );
+            println!(
+                "The last number of super integers is {:?}",
+                bench_it(|| { super_int.last() })
+            );
+        }
     }
 }
