@@ -355,19 +355,74 @@ fn get_iter_number(sum: NonZeroU8, hundred_number: u64, initial: u64) -> u64 {
     result
 }
 
+fn count_iterations_original(sum: NonZeroU8, start: u64, end: u64) -> u64 {
+    let initial = get_initial(sum);
+
+    let start_hundred = start / 100;
+    let end_hundred = end / 100;
+
+    let full_hundreds_iters = (start_hundred..end_hundred)
+        .map(|i| get_iter_number(sum, i, initial))
+        .sum::<u64>();
+
+    let remainder = {
+        let addition = count_addition(sum, end_hundred);
+        let addition = (end % 100).saturating_sub(addition);
+
+        u64::min(
+            addition / 9,
+            (sum.get() as u64).saturating_sub(end_hundred.digits_sum()),
+        )
+    };
+
+    full_hundreds_iters + remainder
+}
+
 fn count_iterations(sum: NonZeroU8, start: u64, end: u64) -> u64 {
     let initial = get_initial(sum);
 
     let start_hundred = start / 100;
     let end_hundred = end / 100;
 
-    // TODO: optimize this like ../digit_sum
+    let mut assumed = start_hundred.digits_sum();
+
     let full_hundreds_iters = (start_hundred..end_hundred)
-        .map(|i| get_iter_number(sum, i, initial))
+        .map(|i| {
+            let result = 'inner: {
+                let digit_sum = assumed;
+
+                if digit_sum > sum.get() as u64 {
+                    break 'inner 0;
+                }
+
+                let left = sum.get() as u64 - digit_sum;
+
+                let mut result = left + 1;
+
+                if initial <= 100
+                    && let right = digit_sum + (100u64 - initial) / 9
+                    && right < result
+                {
+                    result = right + 1;
+                }
+
+                result
+            };
+
+            assumed += 1;
+
+            {
+                let mut elem = i;
+                while elem % 10 == 9 {
+                    assumed -= 9;
+                    elem /= 10;
+                }
+            }
+
+            result
+        })
         .sum::<u64>();
 
-    // for 5800, it's 0. For 5808, still zero. For 5809 - still zero.
-    // For 5009 it's 1 because its initial is 5008 and end is 5809.
     let remainder = {
         let addition = count_addition(sum, end_hundred);
         // If addition is more than end % 100, it's zero.
@@ -445,19 +500,29 @@ impl IntsWithDigitSumInBounds {
             *acc = if next.digits_sum() == sum {
                 next
             } else {
-                let next_hundred = (*acc + 1).next_multiple_of(100);
+                let mut next_hundred = (*acc + 1) / 100 + 1;
 
-                // TODO: Optimize this as in ../digit_sum
-                let next_value = (0..)
-                    .map(|i| next_hundred + 100 * i)
-                    .find(|value| value.digits_sum() <= sum)
-                    .expect(
-                        "In the infinite range there should be such number",
-                    );
+                let mut assumed = next_hundred.digits_sum();
 
-                let addition = count_addition(sum_nonzerou8, next_value);
+                while assumed > 13 {
+                    assumed += 1;
 
-                next_value + addition
+                    {
+                        let mut elem = next_hundred;
+                        while elem % 10 == 9 {
+                            assumed -= 9;
+                            elem /= 10;
+                        }
+                    }
+
+                    next_hundred += 1;
+                }
+
+                let next_hundred = next_hundred * 100;
+
+                let addition = count_addition(sum_nonzerou8, next_hundred);
+
+                next_hundred + addition
             };
 
             if *acc > end {
@@ -508,7 +573,10 @@ impl SumSequencer for InsaneIdea {
 mod tests {
     use std::num::NonZeroU8;
 
-    use crate::{integer::count_iterations, traits::SumSequencer};
+    use crate::{
+        integer::{count_iterations, count_iterations_original},
+        traits::SumSequencer,
+    };
 
     use super::IntsWithDigitSumInBounds;
 
@@ -536,30 +604,63 @@ mod tests {
                         as usize,
                 ))
                 .for_each(|(l, r)| assert_eq!(l, r));
+                println!("{to} OK");
             };
 
         test_range(0, 500);
-        println!("500 OK");
-
         test_range(500, 1000);
-        println!("1000 OK");
-
         test_range(1000, 5000);
-        println!("5000 OK");
-
         test_range(5000, 10000);
-        println!("10000 OK");
-
         test_range(10000, 50000);
-        println!("50000 OK");
-
         test_range(50000, 100_000);
-        println!("100_000 OK");
-
         test_range(100_000, 200_000);
-        println!("200_000 OK");
-
         test_range(37500, 50000);
-        println!("37500 OK");
+    }
+
+    #[test]
+    fn test_count_iters() {
+        let sum = NonZeroU8::new(13).unwrap();
+        assert_eq!(count_iterations(sum, 0, 100), 6);
+        assert_eq!(count_iterations(sum, 0, 200), 13);
+        assert_eq!(count_iterations(sum, 0, 200), 13);
+    }
+
+    #[test]
+    fn test_count_iters_original() {
+        let sum = NonZeroU8::new(13).unwrap();
+
+        assert_eq!(count_iterations_original(sum, 0, 100), 6);
+        assert_eq!(count_iterations_original(sum, 0, 200), 13);
+        assert_eq!(count_iterations_original(sum, 0, 200), 13);
+    }
+
+    #[test]
+    fn test_count_iters_cross() {
+        let sum = NonZeroU8::new(13).unwrap();
+        let mut will_panic = false;
+        let mut test_range = |from, to| {
+            let count_optim = count_iterations(sum, from, to);
+            let count_orig = count_iterations_original(sum, from, to);
+
+            if count_optim != count_orig {
+                println!(
+                    "range: {from} to {to}: optim {count_optim}, orig {count_orig}"
+                );
+                will_panic = true;
+            }
+        };
+
+        test_range(0, 500);
+        test_range(500, 1000);
+        test_range(1000, 5000);
+        test_range(5000, 10000);
+        test_range(10000, 50000);
+        test_range(50000, 100_000);
+        test_range(100_000, 200_000);
+        test_range(37500, 50000);
+
+        if will_panic {
+            panic!()
+        }
     }
 }

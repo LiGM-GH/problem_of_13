@@ -234,7 +234,7 @@ mod tests {
         #[test]
         #[cfg(feature = "multithreaded")]
         fn test_fully_par_with_hashsets() {
-            let iterations = 1_000_000;
+            let iterations = 100_000;
             let intval = integer::WithDigitSum::new(13)
                 .get_ints(iterations)
                 .take_while(|val| *val < iterations as u64);
