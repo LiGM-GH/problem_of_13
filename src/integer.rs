@@ -259,14 +259,7 @@ impl SumSequencer for FullyPar {
     /// }
     /// ```
     fn get_ints(&self, iterations: u32) -> impl Iterator<Item = u64> + use<> {
-        let last_number = bench_it(|| count_iter_end(self.0, iterations))
-            .tap(|val| {
-                print_result("last_number counting")(crate::BenchResult {
-                    duration: val.duration,
-                    value: Some(val.value),
-                })
-            })
-            .value;
+        let last_number = count_iter_end(self.0, iterations);
 
         let num_threads = rayon::current_num_threads() as u64;
 
@@ -468,12 +461,14 @@ fn count_iter_end(sum: NonZeroU8, iterations: u32) -> u64 {
             }
 
             let left = sum_u64 - digit_sum;
-            let right = digit_sum + (100u64 - initial) / 9;
 
             let mut result = left + 1;
-            if initial / 100 != 0 {
+
+            if initial > 100 {
                 break 'iter_count result;
             }
+
+            let right = digit_sum + (100u64 - initial) / 9;
 
             if right < result {
                 result = right + 1;
