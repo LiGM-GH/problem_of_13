@@ -11,4 +11,4 @@ test-all:
     cargo test --features=multithreaded
 
 single-test TESTNAME:
-    cargo test --features=multithreaded {{TESTNAME}}
+    cargo test --features=unstable_deprecated {{TESTNAME}}

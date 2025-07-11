@@ -1,5 +1,6 @@
 use std::num::NonZeroU8;
 
+use integer::count_iter_end;
 use tap::Pipe;
 
 #[allow(unused)]
@@ -36,7 +37,7 @@ impl DigitSum for u64 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BenchResult<T> {
     duration: std::time::Duration,
     value: T,
@@ -55,11 +56,13 @@ fn bench_it<T>(fun: impl FnOnce() -> T) -> BenchResult<T> {
     }
 }
 
-fn print_result<T: std::fmt::Debug>(name: &str) -> impl FnOnce(BenchResult<T>) {
-    move |val: BenchResult<T>| {
+fn print_result<T: std::fmt::Debug>(
+    name: &str,
+) -> impl FnOnce(&BenchResult<T>) {
+    move |val: &BenchResult<T>| {
         println!(
-            "The last number of the {:<20} is {:^20?} with duration of {:^20?}",
-            name, val.value, val.duration
+            "{:<20} | {:^20?} | {:>11.4?} ms",
+            name, val.value, val.duration.as_nanos() as f64 / 1_000_000.0
         )
     }
 }
@@ -68,7 +71,7 @@ fn measure_fun(value: impl SumSequencerOnce, iterations: u32, label: &str) {
     value
         .get_ints(iterations)
         .pipe(|val| bench_it(|| val.last()))
-        .pipe(print_result(label))
+        .pipe_ref(print_result(label))
 }
 
 /// The problem is the following:
@@ -76,6 +79,8 @@ fn measure_fun(value: impl SumSequencerOnce, iterations: u32, label: &str) {
 fn main() {
     let iterations = 1_000_000;
     let sum = NonZeroU8::new(13).expect("Couldn't create NonZeroU8 from 13");
+
+    println!("Iterations number is {iterations}");
 
     measure_fun(integer::WithDigitSum13 {}, iterations, "integer_static");
 
@@ -86,14 +91,23 @@ fn main() {
     measure_fun(integer::FullyPar(sum), iterations, "fully_par");
 
     bench_it(|| integer::FullyPar(sum).get_ints(iterations).last())
-        .pipe(print_result("fully_par full"));
+        .pipe_ref(print_result("fully_par full"));
 
     bench_it(|| integer::FullyPar(sum).get_ints(iterations))
         .pipe(|BenchResult { duration, value }| BenchResult {
             duration,
             value: value.last(),
         })
-        .pipe(print_result("fully_par preproc"));
+        .pipe_ref(print_result("fully_par preproc"));
+
+    bench_it(|| count_iter_end(sum, iterations))
+        .pipe(|BenchResult { duration, value }| BenchResult {
+            duration,
+            value: Some(value),
+        })
+        .pipe_ref(print_result("fully_par count_end"));
+
+    measure_fun(integer::SlowSequential(sum), iterations, "slow_sequential");
 }
 
 fn get_initial(sum: NonZeroU8) -> u64 {
@@ -121,7 +135,7 @@ fn get_initial(sum: NonZeroU8) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZeroU8;
+    use std::{collections::HashSet, num::NonZeroU8};
 
     use crate::{
         bench_it, get_initial, integer, string, traits::SumSequencerOnce,
@@ -197,8 +211,66 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_fully_par_with_zip() {
+        let iterations = 100_000;
+        let intval = integer::WithDigitSum::new(13).get_ints(iterations);
+
+        let super_val = integer::FullyPar::new(13).get_ints(iterations);
+
+        let mut iter = intval.zip(super_val).peekable();
+        let mut need_panic = false;
+
+        while let Some((left, right)) = iter.next() {
+            if left == right
+                && let Some((left_peek, right_peek)) = iter.peek()
+                && left_peek != right_peek
+            {
+                println!("{left} | {right} | {left_peek} | {right_peek}");
+                need_panic = true;
+            }
+        }
+
+        if need_panic {
+            panic!();
+        }
+    }
+
+    #[test]
+    fn test_fully_par_with_hashsets() {
+        let iterations = 100_000;
+        let intval = integer::WithDigitSum::new(13)
+            .get_ints(iterations)
+            .take_while(|val| *val < iterations as u64);
+
+        let super_val = integer::FullyPar::new(13)
+            .get_ints(iterations)
+            .take_while(|val| *val < iterations as u64);
+
+        let int_result = intval.collect::<HashSet<_>>();
+        let super_result = super_val.collect::<HashSet<_>>();
+
+        assert_eq!(
+            super_result
+                .difference(&int_result)
+                .copied()
+                .collect::<Vec<u64>>(),
+            vec![],
+        );
+
+        let mut diff = int_result
+            .difference(&super_result)
+            .copied()
+            .collect::<Vec<u64>>();
+
+        diff.sort();
+
+        assert_eq!(diff, vec![]);
+    }
+
     #[allow(unused, dead_code, deprecated)]
-    mod multithreaded {
+    #[cfg(feature = "unstable_deprecated")]
+    mod deprecated {
         use std::collections::HashSet;
 
         use rayon::iter::{ParallelBridge, ParallelExtend};
@@ -206,66 +278,6 @@ mod tests {
         use crate::{bench_it, integer, traits::SumSequencer};
 
         #[test]
-        #[cfg(feature = "multithreaded")]
-        fn test_fully_par_with_zip() {
-            let iterations = 100_000;
-            let intval = integer::WithDigitSum::new(13).get_ints(iterations);
-
-            let super_val = integer::FullyPar::new(13).get_ints(iterations);
-
-            let mut iter = intval.zip(super_val).peekable();
-            let mut need_panic = false;
-
-            while let Some((left, right)) = iter.next() {
-                if left == right
-                    && let Some((left_peek, right_peek)) = iter.peek()
-                    && left_peek != right_peek
-                {
-                    println!("{left} | {right} | {left_peek} | {right_peek}");
-                    need_panic = true;
-                }
-            }
-
-            if need_panic {
-                panic!();
-            }
-        }
-
-        #[test]
-        #[cfg(feature = "multithreaded")]
-        fn test_fully_par_with_hashsets() {
-            let iterations = 100_000;
-            let intval = integer::WithDigitSum::new(13)
-                .get_ints(iterations)
-                .take_while(|val| *val < iterations as u64);
-
-            let super_val = integer::FullyPar::new(13)
-                .get_ints(iterations)
-                .take_while(|val| *val < iterations as u64);
-
-            let int_result = intval.collect::<HashSet<_>>();
-            let super_result = super_val.collect::<HashSet<_>>();
-
-            assert_eq!(
-                super_result
-                    .difference(&int_result)
-                    .copied()
-                    .collect::<Vec<u64>>(),
-                vec![],
-            );
-
-            let mut diff = int_result
-                .difference(&super_result)
-                .copied()
-                .collect::<Vec<u64>>();
-
-            diff.sort();
-
-            assert_eq!(diff, vec![]);
-        }
-
-        #[test]
-        #[cfg(feature = "multithreaded")]
         fn test_int_super() {
             let iterations = 10000;
 
@@ -283,7 +295,6 @@ mod tests {
         }
 
         #[test]
-        #[cfg(feature = "multithreaded")]
         fn test_super_int_again() {
             let iterations = 100_000;
 

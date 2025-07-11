@@ -3,6 +3,7 @@
 #[macro_export]
 macro_rules! new_expect {
     ($owner:ident) => {
+        #[allow(dead_code)]
         impl $owner {
             pub fn new(
                 value: impl TryInto<NonZeroU8, Error: std::fmt::Debug>,
@@ -17,6 +18,7 @@ macro_rules! new_expect {
 macro_rules! impl_mut_for_refmut {
     ($owner:ident) => {
         #[allow(refining_impl_trait)]
+        #[allow(dead_code)]
         impl SumSequencerMut for &mut $owner {
             fn get_ints(
                 &mut self,

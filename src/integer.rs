@@ -3,11 +3,9 @@
 use std::num::NonZeroU8;
 
 use rayon::prelude::*;
-use tap::Tap;
 
 use crate::{
-    DigitSum, bench_it, get_initial, impl_mut_for_refmut, new_expect,
-    print_result,
+    DigitSum, get_initial, impl_mut_for_refmut, new_expect,
     traits::{SumSequencer, SumSequencerMut},
 };
 
@@ -15,22 +13,24 @@ pub struct WithDigitSum13;
 pub struct WithDigitSum(pub NonZeroU8);
 pub struct FutureLooking(pub NonZeroU8);
 pub struct FullyPar(pub NonZeroU8);
-#[deprecated]
-pub struct Rayon(pub NonZeroU8);
-pub struct InsaneIdea(pub NonZeroU8);
+#[cfg(feature="unstable_deprecated")]
+pub struct NaivePar(pub NonZeroU8);
+pub struct SlowSequential(pub NonZeroU8);
 
 new_expect!(WithDigitSum);
 new_expect!(FutureLooking);
 new_expect!(FullyPar);
-new_expect!(Rayon);
-new_expect!(InsaneIdea);
+#[cfg(feature="unstable_deprecated")]
+new_expect!(NaivePar);
+new_expect!(SlowSequential);
 
 impl_mut_for_refmut!(WithDigitSum13);
 impl_mut_for_refmut!(WithDigitSum);
 impl_mut_for_refmut!(FutureLooking);
 impl_mut_for_refmut!(FullyPar);
-impl_mut_for_refmut!(Rayon);
-impl_mut_for_refmut!(InsaneIdea);
+#[cfg(feature="unstable_deprecated")]
+impl_mut_for_refmut!(NaivePar);
+impl_mut_for_refmut!(SlowSequential);
 
 impl SumSequencer for WithDigitSum13 {
     fn get_ints(&self, iterations: u32) -> impl Iterator<Item = u64> + use<> {
@@ -110,7 +110,8 @@ impl SumSequencer for WithDigitSum {
     }
 }
 
-impl SumSequencer for Rayon {
+#[cfg(feature="unstable_deprecated")]
+impl SumSequencer for NaivePar {
     /// This function is here as a reminder that not everything that looks like an optimization is one.
     /// It is actually much slower than integer_dynamic and integer_static.
     /// The reasons are simple: each thread creation is actually a syscall.
@@ -322,56 +323,7 @@ struct IntsWithDigitSumInBounds {
     sum: NonZeroU8,
 }
 
-fn get_iter_number(sum: NonZeroU8, hundred_number: u64, initial: u64) -> u64 {
-    // Ok, let's say we've got sum = 13, hundred_number = 5, initial = 49.
-    // digit_sum = 5
-    let digit_sum = hundred_number.digits_sum();
-
-    // left = (13 - 5) = 8
-    let Some(left) = (sum.get() as u64).checked_sub(digit_sum) else {
-        return 0;
-    };
-
-    let mut result = left + 1;
-
-    // right = 5 + (100 - 49) / 9 = 5 + (51 / 9) = 5 + 5 = 10
-    if let Some(right) =
-        (|| digit_sum.checked_add((100u64.checked_sub(initial)?) / 9))()
-        && right < result
-    {
-        // right = 8. But is it right?
-        // It's most clearly 508, 517, 526, 535, 544, 553, 562, 571, 580 which is 9.
-
-        result = right + 1;
-    }
-
-    result
-}
-
-fn count_iterations_original(sum: NonZeroU8, start: u64, end: u64) -> u64 {
-    let initial = get_initial(sum);
-
-    let start_hundred = start / 100;
-    let end_hundred = end / 100;
-
-    let full_hundreds_iters = (start_hundred..end_hundred)
-        .map(|i| get_iter_number(sum, i, initial))
-        .sum::<u64>();
-
-    let remainder = {
-        let addition = count_addition(sum, end_hundred);
-        let addition = (end % 100).saturating_sub(addition);
-
-        u64::min(
-            addition / 9,
-            (sum.get() as u64).saturating_sub(end_hundred.digits_sum()),
-        )
-    };
-
-    full_hundreds_iters + remainder
-}
-
-fn count_iterations(sum: NonZeroU8, start: u64, end: u64) -> u64 {
+pub fn count_iterations(sum: NonZeroU8, start: u64, end: u64) -> u64 {
     let initial = get_initial(sum);
 
     let start_hundred = start / 100;
@@ -431,7 +383,8 @@ fn count_iterations(sum: NonZeroU8, start: u64, end: u64) -> u64 {
     full_hundreds_iters + remainder
 }
 
-fn count_iter_end(sum: NonZeroU8, iterations: u32) -> u64 {
+pub fn count_iter_end(sum: NonZeroU8, iterations: u32) -> u64 {
+    // TODO: This must be optimizable. It is now the slowest part in all the FullyPar realization.
     let mut iterations = iterations as u64;
     let mut i = 0;
     let initial = get_initial(sum);
@@ -535,7 +488,7 @@ impl IntsWithDigitSumInBounds {
     }
 }
 
-impl SumSequencer for InsaneIdea {
+impl SumSequencer for SlowSequential {
     fn get_ints(&self, iterations: u32) -> impl Iterator<Item = u64> + use<> {
         let sum_u64 = self.0.get() as u64;
 
@@ -569,11 +522,63 @@ mod tests {
     use std::num::NonZeroU8;
 
     use crate::{
-        integer::{count_iterations, count_iterations_original},
-        traits::SumSequencer,
+        DigitSum, get_initial, integer::count_iterations, traits::SumSequencer,
     };
 
-    use super::IntsWithDigitSumInBounds;
+    use super::{IntsWithDigitSumInBounds, count_addition};
+
+    fn get_iter_number(
+        sum: NonZeroU8,
+        hundred_number: u64,
+        initial: u64,
+    ) -> u64 {
+        // Ok, let's say we've got sum = 13, hundred_number = 5, initial = 49.
+        // digit_sum = 5
+        let digit_sum = hundred_number.digits_sum();
+
+        // left = (13 - 5) = 8
+        let Some(left) = (sum.get() as u64).checked_sub(digit_sum) else {
+            return 0;
+        };
+
+        let mut result = left + 1;
+
+        // right = 5 + (100 - 49) / 9 = 5 + (51 / 9) = 5 + 5 = 10
+        if let Some(right) =
+            (|| digit_sum.checked_add((100u64.checked_sub(initial)?) / 9))()
+            && right < result
+        {
+            // right = 8. But is it right?
+            // It's most clearly 508, 517, 526, 535, 544, 553, 562, 571, 580 which is 9.
+
+            result = right + 1;
+        }
+
+        result
+    }
+
+    fn count_iterations_original(sum: NonZeroU8, start: u64, end: u64) -> u64 {
+        let initial = get_initial(sum);
+
+        let start_hundred = start / 100;
+        let end_hundred = end / 100;
+
+        let full_hundreds_iters = (start_hundred..end_hundred)
+            .map(|i| get_iter_number(sum, i, initial))
+            .sum::<u64>();
+
+        let remainder = {
+            let addition = count_addition(sum, end_hundred);
+            let addition = (end % 100).saturating_sub(addition);
+
+            u64::min(
+                addition / 9,
+                (sum.get() as u64).saturating_sub(end_hundred.digits_sum()),
+            )
+        };
+
+        full_hundreds_iters + remainder
+    }
 
     #[test]
     fn test_bounds() {
