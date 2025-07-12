@@ -140,7 +140,7 @@ impl SumSequencer for WithDigitSumAdvanced {
 
                     let mut assumed = next.digits_sum();
 
-                    while assumed > sum && sum - assumed >= 100 {
+                    while assumed > sum || sum - assumed >= 100 {
                         assumed += 1;
 
                         {
@@ -243,7 +243,7 @@ impl SumSequencer for FutureLooking {
 
                     let mut assumed = next.digits_sum();
 
-                    while assumed > sum && sum - assumed >= 100 {
+                    while assumed > sum || sum - assumed >= 100 {
                         assumed += 1;
 
                         {
@@ -555,7 +555,9 @@ impl IntsWithDigitSumInBounds {
 
                 let mut assumed = next_hundred.digits_sum();
 
-                while assumed > sum && next_hundred * 100 <= end && assumed - sum >= 100 {
+                while (assumed > sum || assumed - sum >= 100)
+                    && next_hundred * 100 <= end
+                {
                     assumed += 1;
 
                     {

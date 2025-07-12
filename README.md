@@ -24,11 +24,11 @@ The bench results look like this (K = 1_000_000, M = 13):
 
 | Name                   | Resulting value | Execution time |
 | ----                   | ---------       | --------:      |
-| integer_static         | 30611101000     |   4593.5912 ms |
-| integer_dynamic        | 30611101000     |   4574.1321 ms |
-| integer_advanced       | 30611101000     |    370.5282 ms |
-| future_looking         | 30611101000     |    317.8272 ms |
-| slow_sequential        | 30611101000     |  24004.0226 ms |
+| integer_static         | 30611101000     |   4603.9574 ms |
+| integer_dynamic        | 30611101000     |   4569.7545 ms |
+| integer_advanced       | 30611101000     |    361.3863 ms |
+| future_looking         | 30611101000     |    467.3362 ms |
+| slow_sequential        | 30611101000     |  23852.7087 ms |
 
 > Benches are not performed on a public server, just locally.
 > This is not perfectly fair (meaning you'll probably get different execution times).
