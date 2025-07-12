@@ -1,18 +1,3 @@
-// // TODO: Figure out how to make this work
-// #[allow(refining_impl_trait)]
-// impl<T: SumSequencerMut> SumSequencerMut for &mut T {
-//     /// Since
-//     /// `impl IntsWithDigitSum for AnyPossibleT` doesn't reference AnyPossibleT
-//     /// then
-//     /// `impl IntsWithDigitSum for &mut AnyPossibleT` doesn't reference AnyPossibleT either.
-//     fn get_ints(
-//         &mut self,
-//         iterations: u32,
-//     ) -> impl Iterator<Item = u64> + use<T> {
-//         <T as SumSequencerMut>::get_ints(*self, iterations)
-//     }
-// }
-
 pub trait SumSequencerOnce {
     fn get_ints(self, iterations: u32)
     -> impl Iterator<Item = u64> + use<Self>;
@@ -60,6 +45,20 @@ impl<T: SumSequencer> SumSequencer for &T {
 // // TODO: Figure out how to make this work
 // #[allow(refining_impl_trait)]
 // impl<T: SumSequencer> SumSequencerMut for &mut T {
+//     /// Since
+//     /// `impl IntsWithDigitSum for AnyPossibleT` doesn't reference AnyPossibleT
+//     /// then
+//     /// `impl IntsWithDigitSum for &mut AnyPossibleT` doesn't reference AnyPossibleT either.
+//     fn get_ints(
+//         &mut self,
+//         iterations: u32,
+//     ) -> impl Iterator<Item = u64> + use<T> {
+//         <T as SumSequencerMut>::get_ints(*self, iterations)
+//     }
+// }
+//
+// #[allow(refining_impl_trait)]
+// impl<T: SumSequencerMut> SumSequencerMut for &mut T {
 //     /// Since
 //     /// `impl IntsWithDigitSum for AnyPossibleT` doesn't reference AnyPossibleT
 //     /// then
@@ -147,11 +146,10 @@ mod tests {
                 _inner: PhantomData {},
             };
 
-        const _MUT_IS_SEQ_MUT: AssertSumSequencerMut<
-            Test2SumSequencer,
-        > = AssertSumSequencerMut {
-            _inner: PhantomData {},
-        };
+        const _MUT_IS_SEQ_MUT: AssertSumSequencerMut<Test2SumSequencer> =
+            AssertSumSequencerMut {
+                _inner: PhantomData {},
+            };
 
         const _MUT_IS_SEQ_MUT_REF: AssertSumSequencerMut<
             &mut Test2SumSequencer,

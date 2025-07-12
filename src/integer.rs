@@ -11,24 +11,27 @@ use crate::{
 
 pub struct WithDigitSum13;
 pub struct WithDigitSum(pub NonZeroU8);
+pub struct WithDigitSumAdvanced(pub NonZeroU8);
 pub struct FutureLooking(pub NonZeroU8);
 pub struct FullyPar(pub NonZeroU8);
-#[cfg(feature="unstable_deprecated")]
+#[cfg(feature = "unstable_deprecated")]
 pub struct NaivePar(pub NonZeroU8);
 pub struct SlowSequential(pub NonZeroU8);
 
 new_expect!(WithDigitSum);
+new_expect!(WithDigitSumAdvanced);
 new_expect!(FutureLooking);
 new_expect!(FullyPar);
-#[cfg(feature="unstable_deprecated")]
+#[cfg(feature = "unstable_deprecated")]
 new_expect!(NaivePar);
 new_expect!(SlowSequential);
 
 impl_mut_for_refmut!(WithDigitSum13);
 impl_mut_for_refmut!(WithDigitSum);
+impl_mut_for_refmut!(WithDigitSumAdvanced);
 impl_mut_for_refmut!(FutureLooking);
 impl_mut_for_refmut!(FullyPar);
-#[cfg(feature="unstable_deprecated")]
+#[cfg(feature = "unstable_deprecated")]
 impl_mut_for_refmut!(NaivePar);
 impl_mut_for_refmut!(SlowSequential);
 
@@ -88,7 +91,6 @@ impl SumSequencer for WithDigitSum {
                 } else {
                     let mut next = (*acc + 1).next_multiple_of(100);
 
-                    // TODO: This can probably be optimized as in ../digit_sum, at least, to single digits_sum() call
                     while next.digits_sum() > sum {
                         next = (next + 1).next_multiple_of(100);
                     }
@@ -110,7 +112,58 @@ impl SumSequencer for WithDigitSum {
     }
 }
 
-#[cfg(feature="unstable_deprecated")]
+impl SumSequencer for WithDigitSumAdvanced {
+    fn get_ints(&self, iterations: u32) -> impl Iterator<Item = u64> + use<> {
+        let sum = self.0;
+        let initial = get_initial(sum);
+        let sum = sum.get() as u64;
+
+        std::iter::once(initial).chain((0..iterations - 1).scan(
+            initial,
+            move |acc, _| {
+                let next = *acc + 9;
+
+                *acc = if next.digits_sum() == sum {
+                    next
+                } else {
+                    let mut next = (*acc + 1) / 100 + 1;
+
+                    let mut assumed = next.digits_sum();
+
+                    while assumed > 13 {
+                        assumed += 1;
+
+                        {
+                            let mut elem = next;
+                            while elem % 10 == 9 {
+                                assumed -= 9;
+                                elem /= 10;
+                            }
+                        }
+
+                        next += 1;
+                    }
+
+                    next *= 100;
+
+                    let remainder = sum - next.digits_sum();
+
+                    let addition = if remainder / 10 > 0 {
+                        remainder * 10 - 81
+                    } else {
+                        remainder
+                    };
+
+                    next + addition
+                };
+
+                Some(*acc)
+            },
+        ))
+    }
+}
+
+#[cfg(feature = "unstable_deprecated")]
 impl SumSequencer for NaivePar {
     /// This function is here as a reminder that not everything that looks like an optimization is one.
     /// It is actually much slower than integer_dynamic and integer_static.
@@ -384,7 +437,7 @@ pub fn count_iterations(sum: NonZeroU8, start: u64, end: u64) -> u64 {
 }
 
 pub fn count_iter_end(sum: NonZeroU8, iterations: u32) -> u64 {
-    // TODO: This must be optimizable. It is now the slowest part in all the FullyPar realization.
+    // TODO: This must be optimizable. It is now the slowest part of the FullyPar realization.
     let mut iterations = iterations as u64;
     let mut i = 0;
     let initial = get_initial(sum);

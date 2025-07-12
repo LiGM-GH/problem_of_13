@@ -2,7 +2,10 @@
 
 use std::num::NonZeroU8;
 
-use crate::{new_expect, traits::{SumSequencer, SumSequencerMut}};
+use crate::{
+    new_expect,
+    traits::{SumSequencer, SumSequencerMut},
+};
 
 pub struct WithDigitSum13;
 pub struct WithDigitSum(pub NonZeroU8);
@@ -12,10 +15,7 @@ impl_mut_for_refmut!(WithDigitSum);
 impl_mut_for_refmut!(WithDigitSum13);
 
 impl SumSequencer for WithDigitSum13 {
-    fn get_ints(
-        &self,
-        iterations: u32,
-    ) -> impl Iterator<Item = u64> + use<> {
+    fn get_ints(&self, iterations: u32) -> impl Iterator<Item = u64> + use<> {
         (0..iterations).scan(49, |acc, _| {
             while acc
                 .to_string()
@@ -43,10 +43,7 @@ impl SumSequencer for WithDigitSum13 {
 }
 
 impl SumSequencer for WithDigitSum {
-    fn get_ints(
-        &self,
-        iterations: u32,
-    ) -> impl Iterator<Item = u64> + use<> {
+    fn get_ints(&self, iterations: u32) -> impl Iterator<Item = u64> + use<> {
         let sum = self.0;
         let sum = sum.get();
 

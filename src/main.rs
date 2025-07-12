@@ -62,7 +62,9 @@ fn print_result<T: std::fmt::Debug>(
     move |val: &BenchResult<T>| {
         println!(
             "{:<20} | {:^20?} | {:>11.4?} ms",
-            name, val.value, val.duration.as_nanos() as f64 / 1_000_000.0
+            name,
+            val.value,
+            val.duration.as_nanos() as f64 / 1_000_000.0
         )
     }
 }
@@ -86,12 +88,18 @@ fn main() {
 
     measure_fun(integer::WithDigitSum(sum), iterations, "integer_dynamic");
 
-    measure_fun(integer::FutureLooking(sum), iterations, "future_looking");
+    measure_fun(
+        integer::WithDigitSumAdvanced(sum),
+        iterations,
+        "integer_advanced",
+    );
 
-    measure_fun(integer::FullyPar(sum), iterations, "fully_par");
+    measure_fun(integer::FutureLooking(sum), iterations, "future_looking");
 
     bench_it(|| integer::FullyPar(sum).get_ints(iterations).last())
         .pipe_ref(print_result("fully_par full"));
+
+    measure_fun(integer::FullyPar(sum), iterations, "fully_par iters");
 
     bench_it(|| integer::FullyPar(sum).get_ints(iterations))
         .pipe(|BenchResult { duration, value }| BenchResult {
