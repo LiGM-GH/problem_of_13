@@ -13,6 +13,7 @@ pub struct WithDigitSum13;
 pub struct WithDigitSum(pub NonZeroU8);
 pub struct WithDigitSumAdvanced(pub NonZeroU8);
 pub struct FutureLooking(pub NonZeroU8);
+#[cfg(feature = "unstable_deprecated")]
 pub struct FullyPar(pub NonZeroU8);
 #[cfg(feature = "unstable_deprecated")]
 pub struct NaivePar(pub NonZeroU8);
@@ -21,6 +22,7 @@ pub struct SlowSequential(pub NonZeroU8);
 new_expect!(WithDigitSum);
 new_expect!(WithDigitSumAdvanced);
 new_expect!(FutureLooking);
+#[cfg(feature = "unstable_deprecated")]
 new_expect!(FullyPar);
 #[cfg(feature = "unstable_deprecated")]
 new_expect!(NaivePar);
@@ -30,6 +32,7 @@ impl_mut_for_refmut!(WithDigitSum13);
 impl_mut_for_refmut!(WithDigitSum);
 impl_mut_for_refmut!(WithDigitSumAdvanced);
 impl_mut_for_refmut!(FutureLooking);
+#[cfg(feature = "unstable_deprecated")]
 impl_mut_for_refmut!(FullyPar);
 #[cfg(feature = "unstable_deprecated")]
 impl_mut_for_refmut!(NaivePar);
@@ -95,13 +98,20 @@ impl SumSequencer for WithDigitSum {
                         next = (next + 1).next_multiple_of(100);
                     }
 
-                    let remainder = sum - next.digits_sum();
+                    let mut remainder = sum - next.digits_sum();
+                    let mut addition = 0;
+                    let mut i = 1;
 
-                    let addition = if remainder / 10 > 0 {
-                        remainder * 10 - 81
-                    } else {
-                        remainder
-                    };
+                    while remainder != 0 {
+                        if remainder >= 9 {
+                            addition += 9 * i;
+                            remainder -= 9;
+                        } else {
+                            addition += remainder * i;
+                            remainder = 0;
+                        }
+                        i *= 10;
+                    }
 
                     next + addition
                 };
@@ -126,11 +136,11 @@ impl SumSequencer for WithDigitSumAdvanced {
                 *acc = if next.digits_sum() == sum {
                     next
                 } else {
-                    let mut next = (*acc + 1) / 100 + 1;
+                    let mut next = *acc / 100 + 1;
 
                     let mut assumed = next.digits_sum();
 
-                    while assumed > 13 {
+                    while assumed > sum && sum - assumed >= 100 {
                         assumed += 1;
 
                         {
@@ -146,13 +156,20 @@ impl SumSequencer for WithDigitSumAdvanced {
 
                     next *= 100;
 
-                    let remainder = sum - next.digits_sum();
+                    let mut remainder = sum - assumed;
+                    let mut addition = 0;
+                    let mut i = 1;
 
-                    let addition = if remainder / 10 > 0 {
-                        remainder * 10 - 81
-                    } else {
-                        remainder
-                    };
+                    while remainder != 0 {
+                        if remainder >= 9 {
+                            addition += 9 * i;
+                            remainder -= 9;
+                        } else {
+                            addition += remainder * i;
+                            remainder = 0;
+                        }
+                        i *= 10;
+                    }
 
                     next + addition
                 };
@@ -213,7 +230,6 @@ impl SumSequencer for FutureLooking {
     fn get_ints(&self, iterations: u32) -> impl Iterator<Item = u64> + use<> {
         let initial = get_initial(self.0);
         let sum = self.0.get() as u64;
-        let sum_nonzerou8 = self.0;
 
         std::iter::once(initial).chain((0..iterations - 1).scan(
             initial,
@@ -223,18 +239,42 @@ impl SumSequencer for FutureLooking {
                 *acc = if next.digits_sum() == sum {
                     next
                 } else {
-                    let next = (*acc + 1).next_multiple_of(100);
+                    let mut next = *acc / 100 + 1;
 
-                    let next_value = (0..)
-                        .map(|i| next + 100 * i)
-                        .find(|value| value.digits_sum() <= sum)
-                        .expect(
-                            "In the infinite range there should be such number",
-                        );
+                    let mut assumed = next.digits_sum();
 
-                    let addition = count_addition(sum_nonzerou8, next_value);
+                    while assumed > sum && sum - assumed >= 100 {
+                        assumed += 1;
 
-                    next_value + addition
+                        {
+                            let mut elem = next;
+                            while elem % 10 == 9 {
+                                assumed -= 9;
+                                elem /= 10;
+                            }
+                        }
+
+                        next += 1;
+                    }
+
+                    next *= 100;
+
+                    let mut remainder = sum - assumed;
+                    let mut addition = 0;
+                    let mut i = 1;
+
+                    while remainder != 0 {
+                        if remainder >= 9 {
+                            addition += 9 * i;
+                            remainder -= 9;
+                        } else {
+                            addition += remainder * i;
+                            remainder = 0;
+                        }
+                        i *= 10;
+                    }
+
+                    next + addition
                 };
 
                 Some(*acc)
@@ -244,18 +284,27 @@ impl SumSequencer for FutureLooking {
 }
 
 fn count_addition(sum: NonZeroU8, value: u64) -> u64 {
-    let remainder = (sum.get() as u64).saturating_sub(value.digits_sum());
+    let mut remainder = sum.get() as u64 - value.digits_sum();
+    let mut addition = 0;
+    let mut i = 1;
 
-    if remainder / 10 > 0 {
-        // NOTE: actually, (10 * (remainder - 9)) + 9
-        remainder * 10 - 81
-    } else {
-        remainder
+    while remainder != 0 {
+        if remainder >= 9 {
+            addition += 9 * i;
+            remainder -= 9;
+        } else {
+            addition += remainder * i;
+            remainder = 0;
+        }
+        i *= 10;
     }
+
+    addition
 }
 
+#[cfg(feature = "unstable_deprecated")]
 impl SumSequencer for FullyPar {
-    /// NOTE: How to count the highest number (or at least its number of digits) ahead of time?
+    /// How to count the highest number (or at least its number of digits) ahead of time?
     ///
     /// Let's say we have 10 iterations.
     /// It's pretty obvious that we had 49 so it's 5 + 5 iterations which leads to 200 being the high end.
@@ -436,6 +485,7 @@ pub fn count_iterations(sum: NonZeroU8, start: u64, end: u64) -> u64 {
     full_hundreds_iters + remainder
 }
 
+#[cfg(feature = "unstable_deprecated")]
 pub fn count_iter_end(sum: NonZeroU8, iterations: u32) -> u64 {
     // TODO: This must be optimizable. It is now the slowest part of the FullyPar realization.
     let mut iterations = iterations as u64;
@@ -501,11 +551,11 @@ impl IntsWithDigitSumInBounds {
             *acc = if next.digits_sum() == sum {
                 next
             } else {
-                let mut next_hundred = (*acc + 1) / 100 + 1;
+                let mut next_hundred = *acc / 100 + 1;
 
                 let mut assumed = next_hundred.digits_sum();
 
-                while assumed > 13 {
+                while assumed > sum && next_hundred * 100 <= end && assumed - sum >= 100 {
                     assumed += 1;
 
                     {
@@ -526,14 +576,14 @@ impl IntsWithDigitSumInBounds {
                 next_hundred + addition
             };
 
-            if *acc > end {
+            if *acc >= end {
                 return None;
             }
 
             Some(*acc)
         });
 
-        if initial.digits_sum() == 13 {
+        if initial.digits_sum() == sum {
             EitherIterator::Left(std::iter::once(initial).chain(inner_iter))
         } else {
             EitherIterator::Right(inner_iter)
