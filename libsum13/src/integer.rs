@@ -5,9 +5,32 @@ use std::num::NonZeroU8;
 use rayon::prelude::*;
 
 use crate::{
-    DigitSum, get_initial, impl_mut_for_refmut, new_expect,
+    DigitSum, impl_mut_for_refmut, new_expect,
     traits::{SumSequencer, SumSequencerMut},
 };
+
+fn get_initial(sum: NonZeroU8) -> u64 {
+    let mut sum_clone = sum.get();
+    let mut first = 0u64;
+    let mut i = 1;
+
+    while sum_clone != 0 {
+        match sum_clone.checked_sub(9) {
+            Some(value) => {
+                sum_clone = value;
+                first += 9 * i;
+            }
+            None => {
+                first += sum_clone as u64 * i;
+                sum_clone = 0;
+            }
+        }
+
+        i *= 10;
+    }
+
+    first
+}
 
 pub struct WithDigitSum13;
 pub struct WithDigitSum(pub NonZeroU8);
@@ -337,7 +360,7 @@ impl SumSequencer for FullyPar {
     /// | 20             | 2029            | 2092           | 7                | 5 + hundred_number    |
     /// ```
     ///
-    /// Thus,
+    /// Thus, something like
     /// ```rust,ignore
     /// fn get_iter_number(hundred_number: u64, initial: u64) -> u64 {
     ///     let digit_sum = hundred_number.digit_sum();
@@ -489,7 +512,7 @@ pub fn count_iterations(sum: NonZeroU8, start: u64, end: u64) -> u64 {
     full_hundreds_iters + remainder
 }
 
-pub fn count_iter_end(sum: NonZeroU8, iterations: u32) -> u64 {
+pub(crate) fn count_iter_end(sum: NonZeroU8, iterations: u32) -> u64 {
     // TODO: This must be optimizable. It is now the slowest part of the FullyPar realization.
     let mut iterations = iterations as u64;
     let mut i = 0;
@@ -662,11 +685,39 @@ impl SumSequencer for SlowSequential {
 mod tests {
     use std::num::NonZeroU8;
 
-    use crate::{
-        DigitSum, get_initial, integer::count_iterations, traits::SumSequencer,
-    };
+    use crate::{DigitSum, integer::count_iterations, traits::SumSequencer};
 
-    use super::{IntsWithDigitSumInBounds, count_addition};
+    use super::{IntsWithDigitSumInBounds, count_addition, get_initial};
+
+    #[test]
+    fn test_initial() {
+        assert_eq!(get_initial(NonZeroU8::new(1).unwrap()), 1);
+        assert_eq!(get_initial(NonZeroU8::new(2).unwrap()), 2);
+        assert_eq!(get_initial(NonZeroU8::new(3).unwrap()), 3);
+        assert_eq!(get_initial(NonZeroU8::new(4).unwrap()), 4);
+        assert_eq!(get_initial(NonZeroU8::new(5).unwrap()), 5);
+        assert_eq!(get_initial(NonZeroU8::new(6).unwrap()), 6);
+        assert_eq!(get_initial(NonZeroU8::new(7).unwrap()), 7);
+        assert_eq!(get_initial(NonZeroU8::new(8).unwrap()), 8);
+        assert_eq!(get_initial(NonZeroU8::new(9).unwrap()), 9);
+        assert_eq!(get_initial(NonZeroU8::new(10).unwrap()), 19);
+        assert_eq!(get_initial(NonZeroU8::new(11).unwrap()), 29);
+        assert_eq!(get_initial(NonZeroU8::new(12).unwrap()), 39);
+        assert_eq!(get_initial(NonZeroU8::new(13).unwrap()), 49);
+        assert_eq!(get_initial(NonZeroU8::new(14).unwrap()), 59);
+        assert_eq!(get_initial(NonZeroU8::new(15).unwrap()), 69);
+        assert_eq!(get_initial(NonZeroU8::new(16).unwrap()), 79);
+        assert_eq!(get_initial(NonZeroU8::new(17).unwrap()), 89);
+        assert_eq!(get_initial(NonZeroU8::new(18).unwrap()), 99);
+        assert_eq!(get_initial(NonZeroU8::new(19).unwrap()), 199);
+        assert_eq!(get_initial(NonZeroU8::new(20).unwrap()), 299);
+        assert_eq!(get_initial(NonZeroU8::new(21).unwrap()), 399);
+        assert_eq!(get_initial(NonZeroU8::new(22).unwrap()), 499);
+        assert_eq!(get_initial(NonZeroU8::new(23).unwrap()), 599);
+        assert_eq!(get_initial(NonZeroU8::new(24).unwrap()), 699);
+        assert_eq!(get_initial(NonZeroU8::new(25).unwrap()), 799);
+        assert_eq!(get_initial(NonZeroU8::new(35).unwrap()), 8999);
+    }
 
     fn get_iter_number(
         sum: NonZeroU8,

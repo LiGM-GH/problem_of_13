@@ -2,7 +2,7 @@
 // It's OK.
 #![allow(dead_code, unused)]
 
-pub type PrintOnDrop = Pod;
+pub(crate) type PrintOnDrop = Pod;
 
 /// A debugging utility for multithreaded code.
 /// It groups the debug messages that are pushed into it and then prints once dropped.

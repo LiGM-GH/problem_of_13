@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-unstable_deprecated = []
+unstable_deprecated = ["libsum13/unstable_deprecated"]
 
 [profile.release]
 lto = true
@@ -19,3 +19,7 @@ strip = false
 [dependencies]
 rayon = "1.10.0"
 tap = "1.0.1"
+libsum13 = { path = "./libsum13" }
+
+[workspace]
+members = ["libsum13"]

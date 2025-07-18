@@ -1,0 +1,10 @@
+[package]
+name = "libsum13"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+unstable_deprecated = []
+
+[dependencies]
+rayon = "1.10.0"

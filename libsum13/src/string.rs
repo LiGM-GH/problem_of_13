@@ -3,8 +3,7 @@
 use std::num::NonZeroU8;
 
 use crate::{
-    new_expect,
-    traits::{SumSequencer, SumSequencerMut},
+    impl_mut_for_refmut, new_expect, traits::{SumSequencer, SumSequencerMut}
 };
 
 pub struct WithDigitSum13;
