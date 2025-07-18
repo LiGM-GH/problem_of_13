@@ -368,7 +368,7 @@ impl SumSequencer for FullyPar {
 
         let num_threads = rayon::current_num_threads() as u64;
 
-        if last_number <= num_threads * 100 {
+        if iterations as u64 <= num_threads * 100 {
             // TODO: Test if this is faster or slower than FutureLooking
             return EitherIterator::Left(
                 WithDigitSum(self.0).get_ints(iterations),
