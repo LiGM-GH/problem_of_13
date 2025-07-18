@@ -1,6 +1,5 @@
 use std::num::NonZeroU8;
 
-#[cfg(feature = "unstable_deprecated")]
 use integer::count_iter_end;
 
 use tap::Pipe;
@@ -13,6 +12,7 @@ mod integer;
 mod macros;
 mod string;
 mod traits;
+mod utils;
 
 trait DigitSum {
     fn digits_sum(&self) -> u64;
@@ -98,14 +98,11 @@ fn main() {
 
     measure_fun(integer::FutureLooking(sum), iterations, "future_looking");
 
-    #[cfg(feature = "unstable_deprecated")]
     bench_it(|| integer::FullyPar(sum).get_ints(iterations).last())
         .pipe_ref(print_result("fully_par full"));
 
-    #[cfg(feature = "unstable_deprecated")]
     measure_fun(integer::FullyPar(sum), iterations, "fully_par iters");
 
-    #[cfg(feature = "unstable_deprecated")]
     bench_it(|| integer::FullyPar(sum).get_ints(iterations))
         .pipe(|BenchResult { duration, value }| BenchResult {
             duration,
@@ -113,7 +110,6 @@ fn main() {
         })
         .pipe_ref(print_result("fully_par preproc"));
 
-    #[cfg(feature = "unstable_deprecated")]
     bench_it(|| count_iter_end(sum, iterations))
         .pipe(|BenchResult { duration, value }| BenchResult {
             duration,
@@ -121,7 +117,8 @@ fn main() {
         })
         .pipe_ref(print_result("fully_par count_end"));
 
-    measure_fun(integer::SlowSequential(sum), iterations, "slow_sequential");
+    measure_fun(integer::FullyPar::new(4), 20, "fully_par with 4");
+    // measure_fun(integer::SlowSequential(sum), iterations, "slow_sequential");
 }
 
 fn get_initial(sum: NonZeroU8) -> u64 {
@@ -234,8 +231,13 @@ mod tests {
                 let strs = string::WithDigitSum(sum).get_ints(iterations);
                 let mut should_panic = false;
 
-                for (i, (ints, strs)) in ints.zip(strs).enumerate() {
-                    println!("{i:>3} | {ints} | {strs}");
+                let mut iter = ints.zip(strs).enumerate().peekable();
+                while let Some((i, (ints, strs))) = iter.next() {
+                    if let Some((_i_next, (ints_next, strs_next))) = iter.peek()
+                        && ints_next != strs_next
+                    {
+                        println!("{i:>3} | {ints} | {strs}");
+                    }
                     if ints != strs {
                         should_panic = true;
                         println!(
@@ -266,7 +268,6 @@ mod tests {
                 should_panic = true;
             }
 
-            #[cfg(feature = "unstable_deprecated")]
             if fails_check(
                 integer::FullyPar(sum).get_ints(iterations),
                 sum,
@@ -295,15 +296,15 @@ mod tests {
             }
         };
 
-        test_range(NonZeroU8::new(1 ).unwrap(), 02);
-        test_range(NonZeroU8::new(2 ).unwrap(), 05);
-        test_range(NonZeroU8::new(3 ).unwrap(), 08);
-        test_range(NonZeroU8::new(4 ).unwrap(), 20);
-        test_range(NonZeroU8::new(5 ).unwrap(), 50);
-        test_range(NonZeroU8::new(6 ).unwrap(), 100);
-        test_range(NonZeroU8::new(7 ).unwrap(), 100);
-        test_range(NonZeroU8::new(8 ).unwrap(), 1000);
-        test_range(NonZeroU8::new(9 ).unwrap(), 1000);
+        test_range(NonZeroU8::new(1).unwrap(), 2);
+        test_range(NonZeroU8::new(2).unwrap(), 5);
+        test_range(NonZeroU8::new(3).unwrap(), 8);
+        test_range(NonZeroU8::new(4).unwrap(), 20);
+        test_range(NonZeroU8::new(5).unwrap(), 50);
+        test_range(NonZeroU8::new(6).unwrap(), 100);
+        test_range(NonZeroU8::new(7).unwrap(), 100);
+        test_range(NonZeroU8::new(8).unwrap(), 1000);
+        test_range(NonZeroU8::new(9).unwrap(), 1000);
         test_range(NonZeroU8::new(10).unwrap(), 1000);
         test_range(NonZeroU8::new(11).unwrap(), 1000);
         test_range(NonZeroU8::new(12).unwrap(), 1000);
@@ -362,6 +363,63 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_fully_par_with_zip() {
+        let iterations = 100_000;
+        let intval = integer::WithDigitSum::new(13).get_ints(iterations);
+
+        let super_val = integer::FullyPar::new(13).get_ints(iterations);
+
+        let mut iter = intval.zip(super_val).peekable();
+        let mut need_panic = false;
+
+        while let Some((left, right)) = iter.next() {
+            if left == right
+                && let Some((left_peek, right_peek)) = iter.peek()
+                && left_peek != right_peek
+            {
+                println!("{left} | {right} | {left_peek} | {right_peek}");
+                need_panic = true;
+            }
+        }
+
+        if need_panic {
+            panic!();
+        }
+    }
+
+    #[test]
+    fn test_fully_par_with_hashsets() {
+        let iterations = 100_000;
+        let intval = integer::WithDigitSum::new(13)
+            .get_ints(iterations)
+            .take_while(|val| *val < iterations as u64);
+
+        let super_val = integer::FullyPar::new(13)
+            .get_ints(iterations)
+            .take_while(|val| *val < iterations as u64);
+
+        let int_result = intval.collect::<HashSet<_>>();
+        let super_result = super_val.collect::<HashSet<_>>();
+
+        assert_eq!(
+            super_result
+                .difference(&int_result)
+                .copied()
+                .collect::<Vec<u64>>(),
+            vec![],
+        );
+
+        let mut diff = int_result
+            .difference(&super_result)
+            .copied()
+            .collect::<Vec<u64>>();
+
+        diff.sort();
+
+        assert_eq!(diff, vec![]);
+    }
+
     #[allow(unused, dead_code, deprecated)]
     #[cfg(feature = "unstable_deprecated")]
     mod deprecated {
@@ -372,67 +430,10 @@ mod tests {
         use crate::{bench_it, integer, traits::SumSequencer};
 
         #[test]
-        fn test_fully_par_with_zip() {
-            let iterations = 100_000;
-            let intval = integer::WithDigitSum::new(13).get_ints(iterations);
-
-            let super_val = integer::FullyPar::new(13).get_ints(iterations);
-
-            let mut iter = intval.zip(super_val).peekable();
-            let mut need_panic = false;
-
-            while let Some((left, right)) = iter.next() {
-                if left == right
-                    && let Some((left_peek, right_peek)) = iter.peek()
-                    && left_peek != right_peek
-                {
-                    println!("{left} | {right} | {left_peek} | {right_peek}");
-                    need_panic = true;
-                }
-            }
-
-            if need_panic {
-                panic!();
-            }
-        }
-
-        #[test]
-        fn test_fully_par_with_hashsets() {
-            let iterations = 100_000;
-            let intval = integer::WithDigitSum::new(13)
-                .get_ints(iterations)
-                .take_while(|val| *val < iterations as u64);
-
-            let super_val = integer::FullyPar::new(13)
-                .get_ints(iterations)
-                .take_while(|val| *val < iterations as u64);
-
-            let int_result = intval.collect::<HashSet<_>>();
-            let super_result = super_val.collect::<HashSet<_>>();
-
-            assert_eq!(
-                super_result
-                    .difference(&int_result)
-                    .copied()
-                    .collect::<Vec<u64>>(),
-                vec![],
-            );
-
-            let mut diff = int_result
-                .difference(&super_result)
-                .copied()
-                .collect::<Vec<u64>>();
-
-            diff.sort();
-
-            assert_eq!(diff, vec![]);
-        }
-
-        #[test]
-        fn test_int_super() {
+        fn test_naive_par_against_integers_static() {
             let iterations = 10000;
 
-            let cool = integer::Rayon::new(13).get_ints(iterations);
+            let cool = integer::NaivePar::new(13).get_ints(iterations);
 
             let intval = integer::WithDigitSum13 {}.get_ints(iterations);
 
@@ -446,10 +447,10 @@ mod tests {
         }
 
         #[test]
-        fn test_super_int_again() {
+        fn test_naive_par_against_integers_standard() {
             let iterations = 100_000;
 
-            let intval = integer::Rayon::new(13).get_ints(iterations);
+            let intval = integer::NaivePar::new(13).get_ints(iterations);
             let super_int = integer::WithDigitSum::new(13).get_ints(iterations);
 
             println!(

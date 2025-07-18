@@ -1,14 +1,19 @@
+feature_name := "unstable_deprecated"
+
 default:
     just --list
 
 run:
     cargo run
 
-test:
-    cargo test
+test *CARGO_FLAGS:
+    cargo test --release {{CARGO_FLAGS}}
 
-test-all:
-    cargo test --features=multithreaded
+test-all *CARGO_FLAGS:
+    cargo test --release --features={{feature_name}} {{CARGO_FLAGS}}
 
-single-test TESTNAME:
-    cargo test --features=unstable_deprecated {{TESTNAME}}
+single-test TESTNAME *CARGO_FLAGS:
+    cargo test --release --features={{feature_name}} {{TESTNAME}} {{CARGO_FLAGS}}
+
+profile:
+    cargo build --profile=profiling && samply record target/profiling/problem_of_13

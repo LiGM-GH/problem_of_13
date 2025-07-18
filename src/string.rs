@@ -28,8 +28,6 @@ impl SumSequencer for WithDigitSum13 {
                 .sum::<u64>()
                 != 13
             {
-                // println!("STR_ACCUM: {}", acc);
-
                 *acc += 1;
             }
 
@@ -59,8 +57,6 @@ impl SumSequencer for WithDigitSum {
                 .sum::<u8>()
                 != sum
             {
-                // println!("STR_ACCUM: {}", acc);
-
                 *acc += 1;
             }
 

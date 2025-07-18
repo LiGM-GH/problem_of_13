@@ -1,3 +1,5 @@
+// TODO: remove `iterations` parameter: it should be `.get_ints().take(n)` instead
+
 pub trait SumSequencerOnce {
     fn get_ints(self, iterations: u32)
     -> impl Iterator<Item = u64> + use<Self>;

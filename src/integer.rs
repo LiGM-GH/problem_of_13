@@ -13,7 +13,6 @@ pub struct WithDigitSum13;
 pub struct WithDigitSum(pub NonZeroU8);
 pub struct WithDigitSumAdvanced(pub NonZeroU8);
 pub struct FutureLooking(pub NonZeroU8);
-#[cfg(feature = "unstable_deprecated")]
 pub struct FullyPar(pub NonZeroU8);
 #[cfg(feature = "unstable_deprecated")]
 pub struct NaivePar(pub NonZeroU8);
@@ -22,7 +21,6 @@ pub struct SlowSequential(pub NonZeroU8);
 new_expect!(WithDigitSum);
 new_expect!(WithDigitSumAdvanced);
 new_expect!(FutureLooking);
-#[cfg(feature = "unstable_deprecated")]
 new_expect!(FullyPar);
 #[cfg(feature = "unstable_deprecated")]
 new_expect!(NaivePar);
@@ -32,7 +30,6 @@ impl_mut_for_refmut!(WithDigitSum13);
 impl_mut_for_refmut!(WithDigitSum);
 impl_mut_for_refmut!(WithDigitSumAdvanced);
 impl_mut_for_refmut!(FutureLooking);
-#[cfg(feature = "unstable_deprecated")]
 impl_mut_for_refmut!(FullyPar);
 #[cfg(feature = "unstable_deprecated")]
 impl_mut_for_refmut!(NaivePar);
@@ -284,7 +281,13 @@ impl SumSequencer for FutureLooking {
 }
 
 fn count_addition(sum: NonZeroU8, value: u64) -> u64 {
-    let mut remainder = sum.get() as u64 - value.digits_sum();
+    let sum = sum.get() as u64;
+
+    if sum < value.digits_sum() {
+        return 0;
+    }
+
+    let mut remainder = sum - value.digits_sum();
     let mut addition = 0;
     let mut i = 1;
 
@@ -302,7 +305,6 @@ fn count_addition(sum: NonZeroU8, value: u64) -> u64 {
     addition
 }
 
-#[cfg(feature = "unstable_deprecated")]
 impl SumSequencer for FullyPar {
     /// How to count the highest number (or at least its number of digits) ahead of time?
     ///
@@ -378,10 +380,12 @@ impl SumSequencer for FullyPar {
         EitherIterator::Right(
             std::iter::once_with(move || {
                 let parts = (0..num_threads as u64)
-                    .map(|i| IntsWithDigitSumInBounds {
-                        start: i * (last_number / num_threads),
-                        end: (i + 1) * (last_number / num_threads),
-                        sum: sum_clone,
+                    .map(|i| {
+                        let start = i * (last_number / num_threads);
+                        let end = (i + 1) * (last_number / num_threads);
+                        let sum = sum_clone;
+
+                        IntsWithDigitSumInBounds { start, end, sum }
                     })
                     .collect::<Vec<_>>();
 
@@ -485,7 +489,6 @@ pub fn count_iterations(sum: NonZeroU8, start: u64, end: u64) -> u64 {
     full_hundreds_iters + remainder
 }
 
-#[cfg(feature = "unstable_deprecated")]
 pub fn count_iter_end(sum: NonZeroU8, iterations: u32) -> u64 {
     // TODO: This must be optimizable. It is now the slowest part of the FullyPar realization.
     let mut iterations = iterations as u64;
@@ -539,13 +542,45 @@ pub fn count_iter_end(sum: NonZeroU8, iterations: u32) -> u64 {
 
 impl IntsWithDigitSumInBounds {
     pub fn get_ints(&self) -> impl Iterator<Item = u64> + use<> {
-        let initial = count_addition(self.sum, self.start) + self.start;
-        let iterations = count_iterations(self.sum, self.start, self.end);
+        let start = (self.start / 100) * 100;
+        let end = (self.end / 100) * 100;
+        // let iterations = count_iterations(self.sum, self.start, self.end);
         let sum = self.sum.get() as u64;
         let sum_nonzerou8 = self.sum;
-        let end = self.end;
 
-        let inner_iter = (0..iterations).scan(initial, move |acc, _| {
+        let initial = {
+            if start.digits_sum() == sum {
+                start
+            } else {
+                let mut start_hundred = start / 100;
+
+                let mut assumed = start_hundred.digits_sum();
+
+                while (assumed > sum || sum - assumed >= 100)
+                    && start_hundred * 100 <= end
+                {
+                    assumed += 1;
+
+                    {
+                        let mut elem = start_hundred;
+                        while elem % 10 == 9 {
+                            assumed -= 9;
+                            elem /= 10;
+                        }
+                    }
+
+                    start_hundred += 1;
+                }
+
+                let start_hundred = start_hundred * 100;
+
+                let addition = count_addition(sum_nonzerou8, start_hundred);
+
+                start_hundred + addition
+            }
+        };
+
+        let inner_iter = (0..).scan(initial, move |acc, _| {
             let next = *acc + 9;
 
             *acc = if next.digits_sum() == sum {
@@ -555,9 +590,7 @@ impl IntsWithDigitSumInBounds {
 
                 let mut assumed = next_hundred.digits_sum();
 
-                while (assumed > sum || assumed - sum >= 100)
-                    && next_hundred * 100 <= end
-                {
+                while assumed > sum || sum - assumed >= 100 {
                     assumed += 1;
 
                     {
@@ -569,6 +602,9 @@ impl IntsWithDigitSumInBounds {
                     }
 
                     next_hundred += 1;
+                    if next_hundred * 100 > end {
+                        return None;
+                    }
                 }
 
                 let next_hundred = next_hundred * 100;
@@ -585,7 +621,7 @@ impl IntsWithDigitSumInBounds {
             Some(*acc)
         });
 
-        if initial.digits_sum() == sum {
+        if initial.digits_sum() == sum && initial < end {
             EitherIterator::Left(std::iter::once(initial).chain(inner_iter))
         } else {
             EitherIterator::Right(inner_iter)
