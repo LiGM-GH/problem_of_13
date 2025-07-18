@@ -17,3 +17,6 @@ single-test TESTNAME *CARGO_FLAGS:
 
 profile:
     cargo build --profile=profiling && samply record target/profiling/problem_of_13
+
+check:
+    cargo check --workspace --features={{feature_name}}

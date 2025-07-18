@@ -2,6 +2,7 @@ mod combinatorics;
 pub mod integer;
 pub mod string;
 pub mod traits;
+mod either_iterator;
 mod utils;
 mod macros;
 
