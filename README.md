@@ -22,13 +22,16 @@ There is also plan to add combinatorical solution, but it's unimplemented as of 
 
 The bench results look like this (K = 1_000_000, M = 13):
 
-| Name                   | Resulting value | Execution time |
-| ----                   | ---------       | --------:      |
-| integer_static         | 30611101000     |   4603.9574 ms |
-| integer_dynamic        | 30611101000     |   4569.7545 ms |
-| integer_advanced       | 30611101000     |    361.3863 ms |
-| future_looking         | 30611101000     |    467.3362 ms |
-| slow_sequential        | 30611101000     |  23852.7087 ms |
+| Name                | Resulting value | Execution time |
+| ----                | ---------       | --------:      |
+| integer_static      | 30611101000     | 4623.3618 ms   |
+| integer_dynamic     | 30611101000     | 4583.9194 ms   |
+| integer_advanced    | 30611101000     | 356.1967 ms    |
+| future_looking      | 30611101000     | 357.9142 ms    |
+| fully_par full      | 30611101000     | 456.1541 ms    |
+| fully_par (iters)   | 30611101000     | 112.3055 ms    |
+| fully_par (preproc) | 30611101000     | 346.3530 ms    |
+| slow_sequential     | 30611101000     | 23720.9696 ms  |
 
 > Benches are not performed on a public server, just locally.
 > This is not perfectly fair (meaning you'll probably get different execution times).

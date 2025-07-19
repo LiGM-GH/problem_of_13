@@ -41,7 +41,7 @@ fn print_result<T: std::fmt::Debug>(
 fn measure_fun(value: impl SumSequencerOnce, iterations: u32, label: &str) {
     value
         .get_ints(iterations)
-        .pipe(|val| bench_it(|| val.last()))
+        .pipe(|val| bench_it(|| val.last().unwrap_or(u64::max_value())))
         .pipe_ref(print_result(label))
 }
 
@@ -65,18 +65,22 @@ fn main() {
 
     measure_fun(integer::FutureLooking(sum), iterations, "future_looking");
 
-    bench_it(|| integer::FullyPar(sum).get_ints(iterations).last())
-        .pipe_ref(print_result("fully_par full"));
+    bench_it(|| {
+        integer::FullyPar(sum)
+            .get_ints(iterations)
+            .last()
+            .unwrap_or(0)
+    })
+    .pipe_ref(print_result("fully_par (full)"));
 
-    measure_fun(integer::FullyPar(sum), iterations, "fully_par iters");
+    measure_fun(integer::FullyPar(sum), iterations, "fully_par (iters)");
 
     bench_it(|| integer::FullyPar(sum).get_ints(iterations))
         .pipe(|BenchResult { duration, value }| BenchResult {
             duration,
-            value: value.last(),
+            value: value.last().unwrap_or(0),
         })
-        .pipe_ref(print_result("fully_par preproc"));
+        .pipe_ref(print_result("fully_par (preproc)"));
 
     measure_fun(integer::SlowSequential(sum), iterations, "slow_sequential");
 }
-
