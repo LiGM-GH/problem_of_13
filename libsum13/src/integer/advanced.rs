@@ -12,12 +12,12 @@ new_expect!(WithDigitSumAdvanced);
 impl_mut_for_refmut!(WithDigitSumAdvanced);
 
 impl SumSequencer for WithDigitSumAdvanced {
-    fn get_ints(&self, iterations: u32) -> impl Iterator<Item = u64> + use<> {
+    fn get_ints(&self) -> impl Iterator<Item = u64> + use<> {
         let sum = self.0;
         let initial = get_initial(sum);
         let sum = sum.get() as u64;
 
-        std::iter::once(initial).chain((0..iterations - 1).scan(
+        std::iter::once(initial).chain((0..).scan(
             initial,
             move |acc, _| {
                 let next = *acc + 9;

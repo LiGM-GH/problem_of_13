@@ -14,8 +14,8 @@ impl_mut_for_refmut!(WithDigitSum);
 impl_mut_for_refmut!(WithDigitSum13);
 
 impl SumSequencer for WithDigitSum13 {
-    fn get_ints(&self, iterations: u32) -> impl Iterator<Item = u64> + use<> {
-        (0..iterations).scan(49, |acc, _| {
+    fn get_ints(&self) -> impl Iterator<Item = u64> + use<> {
+        (0..).scan(49, |acc, _| {
             while acc
                 .to_string()
                 .chars()
@@ -40,11 +40,11 @@ impl SumSequencer for WithDigitSum13 {
 }
 
 impl SumSequencer for WithDigitSum {
-    fn get_ints(&self, iterations: u32) -> impl Iterator<Item = u64> + use<> {
+    fn get_ints(&self) -> impl Iterator<Item = u64> + use<> {
         let sum = self.0;
         let sum = sum.get();
 
-        (0..iterations).scan(0, move |acc, _| {
+        (0..).scan(0, move |acc, _| {
             while acc
                 .to_string()
                 .chars()

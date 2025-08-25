@@ -1,15 +1,43 @@
 use std::num::NonZeroU8;
 
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-
-use crate::{
-    either_iterator::EitherIterator, impl_mut_for_refmut, new_expect, traits::{SumSequencer, SumSequencerMut}
+use rayon::iter::{
+    IndexedParallelIterator, IntoParallelIterator, ParallelIterator,
 };
 
-use super::{bounded::IntsWithDigitSumInBounds, count_iter_end, WithDigitSum};
+use crate::{
+    either_iterator::EitherIterator,
+    impl_mut_for_refmut,
+    traits::{SumSequencer, SumSequencerMut},
+};
 
-pub struct FullyPar(pub NonZeroU8);
-new_expect!(FullyPar);
+use super::{WithDigitSum, bounded::IntsWithDigitSumInBounds, count_iter_end};
+
+pub struct FullyPar {
+    sum: NonZeroU8,
+    iterations: u32,
+}
+
+pub struct IncompleteFullyPar(NonZeroU8);
+
+impl FullyPar {
+    pub fn builder(sum: u8) -> Option<IncompleteFullyPar> {
+        Some(IncompleteFullyPar(NonZeroU8::new(sum)?))
+    }
+
+    pub fn from_nonzero(sum: NonZeroU8, iterations: u32) -> FullyPar {
+        FullyPar { sum, iterations }
+    }
+}
+
+impl IncompleteFullyPar {
+    pub fn with_iterations(self, iterations: u32) -> FullyPar {
+        FullyPar {
+            sum: self.0,
+            iterations,
+        }
+    }
+}
+
 impl_mut_for_refmut!(FullyPar);
 
 impl SumSequencer for FullyPar {
@@ -70,19 +98,20 @@ impl SumSequencer for FullyPar {
     ///     i += 1;
     /// }
     /// ```
-    fn get_ints(&self, iterations: u32) -> impl Iterator<Item = u64> + use<> {
-        let last_number = count_iter_end(self.0, iterations);
+    fn get_ints(&self) -> impl Iterator<Item = u64> + use<> {
+        let iterations = self.iterations;
+        let last_number = count_iter_end(self.sum, iterations);
 
         let num_threads = rayon::current_num_threads() as u64;
 
         if iterations as u64 <= num_threads * 100 {
             // TODO: Test if this is faster or slower than FutureLooking
             return EitherIterator::Left(
-                WithDigitSum(self.0).get_ints(iterations),
+                WithDigitSum(self.sum).get_ints().take(iterations as usize),
             );
         }
 
-        let sum_clone = self.0;
+        let sum_clone = self.sum;
 
         EitherIterator::Right(
             std::iter::once_with(move || {

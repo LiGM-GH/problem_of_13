@@ -5,10 +5,10 @@ mod bounded;
 mod dynamic;
 mod fully_par;
 mod future_looking;
-mod sequential;
-mod statique;
 #[cfg(feature = "unstable_deprecated")]
 mod naive_par;
+mod sequential;
+mod statique;
 
 use std::num::NonZeroU8;
 
@@ -17,34 +17,24 @@ pub use bounded::IntsWithDigitSumInBounds;
 pub use dynamic::WithDigitSum;
 pub use fully_par::FullyPar;
 pub use future_looking::FutureLooking;
-pub use sequential::SlowSequential;
-pub use statique::WithDigitSum13;
 #[cfg(feature = "unstable_deprecated")]
 pub use naive_par::NaivePar;
+pub use sequential::SlowSequential;
+pub use statique::WithDigitSum13;
 
 use crate::DigitSum;
 
 fn get_initial(sum: NonZeroU8) -> u64 {
-    let mut sum_clone = sum.get();
-    let mut first = 0u64;
-    let mut i = 1;
+    let sum_clone = sum.get();
 
-    while sum_clone != 0 {
-        match sum_clone.checked_sub(9) {
-            Some(value) => {
-                sum_clone = value;
-                first += 9 * i;
-            }
-            None => {
-                first += sum_clone as u64 * i;
-                sum_clone = 0;
-            }
-        }
+    let division_result = sum_clone / 9;
+    let diff = sum_clone % 9;
 
-        i *= 10;
-    }
+    let initial_power = 10u64.pow(division_result as u32);
+    let initial_nines = initial_power - 1;
+    let initial_mantissa = initial_power * diff as u64;
 
-    first
+    initial_nines + initial_mantissa
 }
 
 fn count_addition(sum: NonZeroU8, value: u64) -> u64 {
@@ -66,6 +56,7 @@ fn count_addition(sum: NonZeroU8, value: u64) -> u64 {
             addition += remainder * i;
             remainder = 0;
         }
+
         i *= 10;
     }
 
@@ -219,6 +210,10 @@ mod tests {
         assert_eq!(get_initial(NonZeroU8::new(24).unwrap()), 699);
         assert_eq!(get_initial(NonZeroU8::new(25).unwrap()), 799);
         assert_eq!(get_initial(NonZeroU8::new(35).unwrap()), 8999);
+        assert_eq!(
+            get_initial(NonZeroU8::new(125).unwrap()),
+            89_999_999_999_999
+        );
     }
 
     fn get_iter_number(
@@ -282,7 +277,7 @@ mod tests {
         println!(
             "{}th of ints is {:?}",
             n,
-            crate::integer::WithDigitSum13 {}.get_ints(10000).nth(n)
+            crate::integer::WithDigitSum13 {}.get_ints().nth(n)
         );
 
         let test_range =
@@ -293,7 +288,7 @@ mod tests {
                     sum: NonZeroU8::new(13).unwrap(),
                 }
                 .get_ints()
-                .zip(crate::integer::WithDigitSum13 {}.get_ints(10000).skip(
+                .zip(crate::integer::WithDigitSum13 {}.get_ints().skip(
                     count_iterations(NonZeroU8::new(13).unwrap(), 0, from)
                         as usize,
                 ))

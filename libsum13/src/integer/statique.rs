@@ -8,8 +8,8 @@ pub struct WithDigitSum13;
 impl_mut_for_refmut!(WithDigitSum13);
 
 impl SumSequencer for WithDigitSum13 {
-    fn get_ints(&self, iterations: u32) -> impl Iterator<Item = u64> + use<> {
-        std::iter::once(49).chain((0..iterations - 1).scan(49u64, |acc, _| {
+    fn get_ints(&self) -> impl Iterator<Item = u64> + use<> {
+        std::iter::once(49).chain((0..).scan(49u64, |acc, _| {
             let next = *acc + 9;
 
             *acc = if next.digits_sum() == 13 {

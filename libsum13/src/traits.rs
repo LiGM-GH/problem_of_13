@@ -1,46 +1,34 @@
-// TODO: remove `iterations` parameter: it should be `.get_ints().take(n)` instead
+// TODO: remove `iterations` parameter: it should be `.get_ints().take(n)` instead,
+// or should be added as a struct field when needed (like in the parallel variant)
 
 pub trait SumSequencerOnce {
-    fn get_ints(self, iterations: u32)
-    -> impl Iterator<Item = u64> + use<Self>;
+    fn get_ints(self) -> impl Iterator<Item = u64> + use<Self>;
 }
 
 pub trait SumSequencerMut {
-    fn get_ints(
-        &mut self,
-        iterations: u32,
-    ) -> impl Iterator<Item = u64> + use<Self>;
+    fn get_ints(&mut self) -> impl Iterator<Item = u64> + use<Self>;
 }
 
 pub trait SumSequencer {
-    fn get_ints(
-        &self,
-        iterations: u32,
-    ) -> impl Iterator<Item = u64> + use<Self>;
+    fn get_ints(&self) -> impl Iterator<Item = u64> + use<Self>;
 }
 
 impl<T: SumSequencer> SumSequencerMut for T {
-    fn get_ints(
-        &mut self,
-        iterations: u32,
-    ) -> impl Iterator<Item = u64> + use<T> {
-        SumSequencer::get_ints(self, iterations)
+    fn get_ints(&mut self) -> impl Iterator<Item = u64> + use<T> {
+        SumSequencer::get_ints(self)
     }
 }
 
 impl<T: SumSequencerMut> SumSequencerOnce for T {
-    fn get_ints(
-        mut self,
-        iterations: u32,
-    ) -> impl Iterator<Item = u64> + use<T> {
-        SumSequencerMut::get_ints(&mut self, iterations)
+    fn get_ints(mut self) -> impl Iterator<Item = u64> + use<T> {
+        SumSequencerMut::get_ints(&mut self)
     }
 }
 
 #[allow(refining_impl_trait)]
 impl<T: SumSequencer> SumSequencer for &T {
-    fn get_ints(&self, iterations: u32) -> impl Iterator<Item = u64> + use<T> {
-        SumSequencer::get_ints(*self, iterations)
+    fn get_ints(&self) -> impl Iterator<Item = u64> + use<T> {
+        SumSequencer::get_ints(*self)
     }
 }
 
@@ -87,10 +75,7 @@ mod tests {
         struct TestSumSequencer;
 
         impl SumSequencer for TestSumSequencer {
-            fn get_ints(
-                &self,
-                iterations: u32,
-            ) -> impl Iterator<Item = u64> + use<> {
+            fn get_ints(&self) -> impl Iterator<Item = u64> + use<> {
                 todo!();
                 vec![].into_iter()
             }
@@ -100,21 +85,15 @@ mod tests {
         struct Test2SumSequencer;
 
         impl SumSequencerMut for Test2SumSequencer {
-            fn get_ints(
-                &mut self,
-                iterations: u32,
-            ) -> impl Iterator<Item = u64> + use<> {
+            fn get_ints(&mut self) -> impl Iterator<Item = u64> + use<> {
                 todo!();
                 vec![].into_iter()
             }
         }
 
         impl SumSequencerMut for &mut Test2SumSequencer {
-            fn get_ints(
-                &mut self,
-                iterations: u32,
-            ) -> impl Iterator<Item = u64> + use<> {
-                SumSequencerMut::get_ints(*self, iterations)
+            fn get_ints(&mut self) -> impl Iterator<Item = u64> + use<> {
+                SumSequencerMut::get_ints(*self)
             }
         }
 

@@ -1,10 +1,10 @@
 mod combinatorics;
+mod either_iterator;
 pub mod integer;
+mod macros;
 pub mod string;
 pub mod traits;
-mod either_iterator;
 mod utils;
-mod macros;
 
 trait DigitSum {
     fn digits_sum(&self) -> u64;
@@ -39,15 +39,13 @@ pub fn add(left: u64, right: u64) -> u64 {
 mod tests {
     use std::{collections::HashSet, num::NonZeroU8};
 
-    use crate::{
-        integer, string, traits::SumSequencerOnce,
-    };
+    use crate::{integer, string, traits::SumSequencerOnce};
 
     #[test]
     fn test_int_variant() {
         let iterations = 10000;
-        let strval = string::WithDigitSum13 {}.get_ints(iterations);
-        let intval = integer::WithDigitSum13 {}.get_ints(iterations);
+        let strval = string::WithDigitSum13 {}.get_ints().take(iterations);
+        let intval = integer::WithDigitSum13 {}.get_ints().take(iterations);
 
         strval
             .zip(intval)
@@ -62,8 +60,13 @@ mod tests {
             println!("iterations: {iterations}");
 
             string::WithDigitSum(number)
-                .get_ints(iterations)
-                .zip(integer::WithDigitSum(number).get_ints(iterations))
+                .get_ints()
+                .take(iterations as usize)
+                .zip(
+                    integer::WithDigitSum(number)
+                        .get_ints()
+                        .take(iterations as usize),
+                )
                 .enumerate()
                 .for_each(|(i, (left, right))| {
                     assert_eq!(
@@ -89,7 +92,9 @@ mod tests {
                 iterations: u32,
                 label: &str,
             ) -> bool {
-                let strs = string::WithDigitSum(sum).get_ints(iterations);
+                let strs = string::WithDigitSum(sum)
+                    .get_ints()
+                    .take(iterations as usize);
                 let mut should_panic = false;
 
                 let mut iter = ints.zip(strs).enumerate().peekable();
@@ -112,7 +117,9 @@ mod tests {
             }
 
             if fails_check(
-                integer::WithDigitSumAdvanced(sum).get_ints(iterations),
+                integer::WithDigitSumAdvanced(sum)
+                    .get_ints()
+                    .take(iterations as usize),
                 sum,
                 iterations,
                 "advanced",
@@ -121,7 +128,9 @@ mod tests {
             }
 
             if fails_check(
-                integer::WithDigitSum(sum).get_ints(iterations),
+                integer::WithDigitSum(sum)
+                    .get_ints()
+                    .take(iterations as usize),
                 sum,
                 iterations,
                 "standard",
@@ -130,7 +139,7 @@ mod tests {
             }
 
             if fails_check(
-                integer::FullyPar(sum).get_ints(iterations),
+                integer::FullyPar::from_nonzero(sum, iterations).get_ints(),
                 sum,
                 iterations,
                 "fully_par",
@@ -139,7 +148,9 @@ mod tests {
             }
 
             if fails_check(
-                integer::FutureLooking(sum).get_ints(iterations),
+                integer::FutureLooking(sum)
+                    .get_ints()
+                    .take(iterations as usize),
                 sum,
                 iterations,
                 "future_looking",
@@ -148,7 +159,9 @@ mod tests {
             }
 
             if fails_check(
-                integer::SlowSequential(sum).get_ints(iterations),
+                integer::SlowSequential(sum)
+                    .get_ints()
+                    .take(iterations as usize),
                 sum,
                 iterations,
                 "slow",
@@ -216,9 +229,17 @@ mod tests {
     #[test]
     fn test_fully_par_with_zip() {
         let iterations = 100_000;
-        let intval = integer::WithDigitSum::new(13).get_ints(iterations);
+        let intval = integer::WithDigitSum::new(13)
+            .get_ints()
+            .take(iterations as usize);
 
-        let super_val = integer::FullyPar::new(13).get_ints(iterations);
+        let Some(prep) = integer::FullyPar::builder(13) else {
+            panic!("FullyPar didn't recognize a proper NonZeroU8");
+        };
+
+        let super_val = prep.with_iterations(iterations)
+            .get_ints()
+            .take(iterations as usize);
 
         let mut iter = intval.zip(super_val).peekable();
         let mut need_panic = false;
@@ -242,11 +263,20 @@ mod tests {
     fn test_fully_par_with_hashsets() {
         let iterations = 100_000;
         let intval = integer::WithDigitSum::new(13)
-            .get_ints(iterations)
+            .get_ints()
+            .take(iterations as usize)
             .take_while(|val| *val < iterations as u64);
 
-        let super_val = integer::FullyPar::new(13)
-            .get_ints(iterations)
+        let Some(super_prep) = integer::FullyPar::builder(13) else {
+            panic!(
+                "Fully parallel didn't recognize a proper NonZeroU8 for some reason!"
+            );
+        };
+
+        let super_val = super_prep
+            .with_iterations(iterations)
+            .get_ints()
+            .take(iterations as usize)
             .take_while(|val| *val < iterations as u64);
 
         let int_result = intval.collect::<HashSet<_>>();
@@ -283,9 +313,13 @@ mod tests {
         fn test_naive_par_against_integers_static() {
             let iterations = 10000;
 
-            let cool = integer::NaivePar::new(13).get_ints(iterations);
+            let cool = integer::NaivePar::new(13)
+                .get_ints()
+                .take(iterations as usize);
 
-            let intval = integer::WithDigitSum13 {}.get_ints(iterations);
+            let intval = integer::WithDigitSum13 {}
+                .get_ints()
+                .take(iterations as usize);
 
             let mut cool_set = HashSet::new();
             cool_set.par_extend(cool.par_bridge());
@@ -300,8 +334,12 @@ mod tests {
         fn test_naive_par_against_integers_standard() {
             let iterations = 100_000;
 
-            let intval = integer::NaivePar::new(13).get_ints(iterations);
-            let super_int = integer::WithDigitSum::new(13).get_ints(iterations);
+            let intval = integer::NaivePar::new(13)
+                .get_ints()
+                .take(iterations as usize);
+            let super_int = integer::WithDigitSum::new(13)
+                .get_ints()
+                .take(iterations as usize);
 
             println!(
                 "The last number of super integers is {:?}",

@@ -20,11 +20,8 @@ macro_rules! impl_mut_for_refmut {
         #[allow(refining_impl_trait)]
         #[allow(dead_code)]
         impl SumSequencerMut for &mut $owner {
-            fn get_ints(
-                &mut self,
-                iterations: u32,
-            ) -> impl Iterator<Item = u64> + use<> {
-                SumSequencerMut::get_ints(*self, iterations)
+            fn get_ints(&mut self) -> impl Iterator<Item = u64> + use<> {
+                SumSequencerMut::get_ints(*self)
             }
         }
     };

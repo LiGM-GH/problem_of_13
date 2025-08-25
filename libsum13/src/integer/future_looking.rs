@@ -12,11 +12,11 @@ new_expect!(FutureLooking);
 impl_mut_for_refmut!(FutureLooking);
 
 impl SumSequencer for FutureLooking {
-    fn get_ints(&self, iterations: u32) -> impl Iterator<Item = u64> + use<> {
+    fn get_ints(&self) -> impl Iterator<Item = u64> + use<> {
         let initial = get_initial(self.0);
         let sum = self.0.get() as u64;
 
-        std::iter::once(initial).chain((0..iterations - 1).scan(
+        std::iter::once(initial).chain((0..).scan(
             initial,
             move |acc, _| {
                 let next = *acc + 9;

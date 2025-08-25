@@ -10,7 +10,7 @@ new_expect!(SlowSequential);
 impl_mut_for_refmut!(SlowSequential);
 
 impl SumSequencer for SlowSequential {
-    fn get_ints(&self, iterations: u32) -> impl Iterator<Item = u64> + use<> {
+    fn get_ints(&self) -> impl Iterator<Item = u64> + use<> {
         let sum_u64 = self.0.get() as u64;
 
         (0..)
@@ -34,6 +34,5 @@ impl SumSequencer for SlowSequential {
                 Some(None)
             })
             .flatten()
-            .take(iterations as usize)
     }
 }
